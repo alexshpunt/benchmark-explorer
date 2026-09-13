@@ -24,7 +24,7 @@ jobs:
           test -n "$HF_TOKEN"
           git clone --depth 1 https://oauth2:${HF_TOKEN}@huggingface.co/spaces/alexshpunt/benchmark-explorer .space
           find .space -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
-          cp app.mjs index.html styles.css .space/
+          cp app.mjs core.mjs index.html styles.css .space/
           cp -R vendor .space/vendor
           cp SPACE.md .space/README.md
           git -C .space add -A

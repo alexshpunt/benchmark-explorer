@@ -4,6 +4,6 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "check": "node --check app.mjs && ! grep -ER 'aggregateLeaderboard|explicit-edit-score|core.mjs' app.mjs index.html"
+    "check": "node --check app.mjs && node --check core.mjs"
   }
 }
