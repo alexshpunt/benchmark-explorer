@@ -480,7 +480,10 @@ export function aggregateLeaderboard(_index, _profiles, _trials, _rounds, filter
   const selected = (actual, expected) => !expected?.length || expected.includes(actual);
   const filtered = rows.filter((row) =>
     selected(row.provider, filters.provider) &&
-    selected(canonicalModelFamily(row.modelFamily), filters.model) &&
+    (!filters.model?.length ||
+      filters.model.some(
+        (model) => canonicalModelFamily(model) === canonicalModelFamily(row.modelFamily),
+      )) &&
     selected(row.thinking, filters.reasoning) &&
     selected(row.agentFamily, filters.agent) &&
     selected(`${row.agentFamily}\t${row.agentVersion}`, filters.agentVersion) &&
