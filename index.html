@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Explore accepted Explicit Edit benchmark observations across agents, harnesses, and models."
+    />
+    <title>Explicit Edit Explorer</title>
+    <script>
+      const theme = new URLSearchParams(window.location.search).get("__theme");
+      if (theme === "light" || theme === "dark") document.documentElement.dataset.theme = theme;
+    </script>
+    <link rel="stylesheet" href="./styles.css" />
+    <script type="module" src="./app.mjs"></script>
+  </head>
+  <body>
+    <!-- Loading screen: the partial UI stays hidden until the shards are in. -->
+    <div id="loader" class="loader" role="status" aria-live="polite">
+      <div class="loader-ring" aria-hidden="true"></div>
+      <p id="loader-text" class="loader-text">Loading benchmark results…</p>
+      <div
+        class="loader-bar"
+        role="progressbar"
+        aria-labelledby="loader-text"
+        aria-valuemin="0"
+        aria-valuemax="100"
+        aria-valuenow="0"
+      >
+        <i id="loader-progress"></i>
+      </div>
+      <p id="loader-detail" class="loader-detail">Reading the dataset index</p>
+    </div>
+    <main>
+      <section class="status-bar" aria-label="Dataset status">
+        <span class="status-badge">
+          <span class="status-dot" aria-hidden="true"></span>
+          <span id="load-status" role="status" aria-live="polite" data-kind="loading"
+            >Preparing to load public data…</span
+          >
+        </span>
+        <dl class="status-meta">
+          <div>
+            <dt>Revision</dt>
+            <dd id="revision">—</dd>
+          </div>
+          <div>
+            <dt>Fetched</dt>
+            <dd id="freshness">—</dd>
+          </div>
+          <div>
+            <dt>Observations</dt>
+            <dd id="observation-total">—</dd>
+          </div>
+        </dl>
+        <p id="error-help" class="error-help" hidden>
+          Check your connection or open the
+          <a href="https://huggingface.co/datasets/alexshpunt/explicit-edit-benchmark"
+            >source dataset</a
+          >.
+        </p>
+      </section>
+
+      <section class="explorer-toolbar" aria-labelledby="explorer-title">
+        <div class="toolbar-heading">
+          <h1 id="explorer-title">Explicit Edit accepted results</h1>
+          <p>Accepted observations across models, agents, and harnesses.</p>
+        </div>
+        <div class="view-actions">
+          <button id="reset-filters" class="icon-button" type="button">Clear all</button>
+          <div id="active-filters" class="active-filters" aria-label="Active filters"></div>
+          <button
+            class="icon-button filter-button"
+            popovertarget="filter-all"
+            aria-label="Filter results"
+            title="Filters"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4" /></svg>
+          </button>
+        </div>
+      </section>
+
+      <section class="summary-row" aria-label="Model and harness matrix">
+        <section class="panel matrix-panel">
+          <div class="panel-heading">
+            <h2 id="matrix-title">Model × harness</h2>
+            <p id="summary-context"></p>
+          </div>
+          <div
+            id="matrix-view"
+            class="matrix-shell"
+            role="region"
+            aria-labelledby="matrix-title"
+          ></div>
+          <div class="matrix-legend" aria-label="Score scale from lowest to highest">
+            <span id="matrix-scale-min">—</span>
+            <span class="matrix-legend-ramp" aria-hidden="true"></span>
+            <span id="matrix-scale-max">—</span>
+          </div>
+        </section>
+      </section>
+      <section
+        id="selection-panel"
+        class="panel selection-panel"
+        aria-label="Selected comparison"
+        hidden
+      >
+        <div class="panel-heading selection-bar">
+          <p id="selection-context"></p>
+          <button id="clear-selection" type="button">Clear selection</button>
+        </div>
+        <div class="selection-body">
+          <section
+            class="selection-block selection-block-families"
+            aria-labelledby="task-family-title"
+          >
+            <div class="panel-heading">
+              <h3 id="task-family-title">Task families</h3>
+              <p id="task-family-context"></p>
+            </div>
+            <div
+              id="task-families"
+              class="tool-usage-shell"
+              role="region"
+              aria-label="Task-family score for selected configurations"
+            ></div>
+          </section>
+          <section class="selection-block selection-block-tools" aria-labelledby="tool-usage-title">
+            <div class="panel-heading">
+              <h3 id="tool-usage-title">Tool usage</h3>
+              <p id="tool-usage-context"></p>
+            </div>
+            <div
+              id="tool-usage"
+              class="tool-usage-shell"
+              role="region"
+              aria-label="Tool usage for selected configurations"
+            ></div>
+          </section>
+        </div>
+      </section>
+      <section id="results-view" class="results-section" aria-label="Leaderboard">
+        <div class="results-subhead">
+          <p>
+            Sort or filter all accepted configurations. Select any cell to see how its value is
+            built.
+          </p>
+          <div id="range-filters" class="active-filters" aria-label="Active range filters"></div>
+        </div>
+        <details class="table-guide">
+          <summary>How to read this table</summary>
+          <p>
+            Trials are benchmark task executions. Coverage is the number of unique tasks observed
+            out of the benchmark total. Score weights first-attempt exactness more heavily than
+            success after recovery. Select any cell to see how its value was computed, or use the
+            filter button in a column header.
+          </p>
+        </details>
+        <div id="results-grid"></div>
+      </section>
+      <dialog id="cell-details" class="cell-details">
+        <div class="cell-details-heading">
+          <div>
+            <h2 id="cell-details-title">Cell details</h2>
+            <p id="cell-details-identity"></p>
+          </div>
+          <form method="dialog">
+            <button type="submit" class="dialog-close" aria-label="Close details" autofocus>
+              ×
+            </button>
+          </form>
+        </div>
+        <div id="cell-details-body"></div>
+      </dialog>
+      <div id="filter-all" class="filter-popover filter-panel" popover></div>
+      <form id="range-filter-form">
+        <div id="range-filter" class="filter-popover range-panel" popover>
+          <p id="range-filter-title" class="range-title"></p>
+          <p class="range-note">Narrows the table only. Other panels stay unchanged.</p>
+          <label class="range-field">
+            <span>Minimum</span>
+            <input id="range-filter-min" type="number" step="any" inputmode="decimal" />
+          </label>
+          <label class="range-field">
+            <span>Maximum</span>
+            <input id="range-filter-max" type="number" step="any" inputmode="decimal" />
+          </label>
+          <div class="range-actions">
+            <button type="submit">Apply</button>
+            <button id="range-filter-clear" type="button">Clear</button>
+          </div>
+        </div>
+      </form>
+      <div id="results-model-filter" hidden></div>
+    </main>
+
+    <footer>
+      <p>Ranking and analysis of accepted Explicit Edit observations.</p>
+      <a href="https://huggingface.co/datasets/alexshpunt/explicit-edit-benchmark"
+        >Accepted results ↗</a
+      >
+      <a href="https://github.com/alexshpunt/explicit-edit">Benchmark source ↗</a>
+    </footer>
+  </body>
+</html>

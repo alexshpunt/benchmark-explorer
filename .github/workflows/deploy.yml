@@ -1,0 +1,32 @@
+name: Deploy public Hugging Face Space
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: benchmark-explorer-space
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - run: npm run check
+      - name: Publish static Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          test -n "$HF_TOKEN"
+          git clone --depth 1 https://oauth2:${HF_TOKEN}@huggingface.co/spaces/alexshpunt/benchmark-explorer .space
+          find .space -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          cp app.mjs core.mjs index.html styles.css .space/
+          cp -R vendor .space/vendor
+          cp SPACE.md .space/README.md
+          git -C .space add -A
+          git -C .space -c user.name='Aleksandr Shpuntenko' -c user.email='alexshpunt@users.noreply.github.com' commit -m "Deploy ${GITHUB_SHA}" || exit 0
+          git -C .space push origin main
