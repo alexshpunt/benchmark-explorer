@@ -1824,17 +1824,7 @@ function addOverflowTitles(host) {
  * one of its harnesses are measured the same way.
  */
 function pooledFamilyScore(rows, family) {
-  const totals = familyTaskTotals();
-  return aggregateGroupScore(
-    rows.map((row) => ({
-      trialSamples: (row.trialSamples ?? []).filter(
-        (sample) => taskFamily(sample.taskId) === family,
-      ),
-      // Inside one family the yardstick is that family's tasks, not the whole
-      // benchmark, which is how the shared aggregation scopes a filtered view.
-      benchmarkTaskCount: totals.get(family) ?? row.benchmarkTaskCount,
-    })),
-  );
+  return aggregateGroupScore(rows.map((row) => familyScore(row, family)).filter(Boolean));
 }
 
 /** Tasks the benchmark defines in each family, counted from the loaded trials. */
