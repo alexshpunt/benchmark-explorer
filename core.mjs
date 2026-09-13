@@ -467,6 +467,22 @@ function averageMetric(rows, name) {
   );
 }
 
+/** Return one precomputed task-family row for an accepted configuration. */
+export function precomputedFamilyScore(row, family) {
+  const candidates = precomputedExplorer?.taskFamilies?.[family] ?? [];
+  return (
+    candidates.find((candidate) =>
+      candidate.configurationHashes?.some((hash) => row.configurationHashes?.includes(hash)),
+    ) ??
+    candidates.find(
+      (candidate) =>
+        canonicalModelFamily(candidate.modelFamily) === canonicalModelFamily(row.modelFamily) &&
+        candidate.harnessFamily === row.harnessFamily &&
+        candidate.harnessVersion === row.harnessVersion,
+    ) ??
+    null
+  );
+}
 /**
  * Build a configurable leaderboard. Empty benchmark and reasoning filters mean
  * “All”: exact observations roll up by reasoning, benchmark version and family.

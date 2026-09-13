@@ -9,6 +9,7 @@ import {
   parseExplorerState,
   parseJsonLines,
   popoverPosition,
+  precomputedFamilyScore,
   taskFamily,
   toolTrialCounts,
   setExplorerData,
@@ -1418,16 +1419,7 @@ function openHarnessDetails(harness, version) {
 
 /** Official family score for one configuration, from the shared aggregation. */
 function familyScore(row, family) {
-  const [result] = aggregateLeaderboard(state.index, state.profiles, state.trials, state.rounds, {
-    ...activeFilters(),
-    model: [canonicalModelFamily(row.modelFamily)],
-    harness: [row.harnessFamily],
-    ...(row.harnessVersion
-      ? { harnessVersion: [`${row.harnessFamily}\t${row.harnessVersion}`] }
-      : {}),
-    taskFamily: [family],
-  });
-  return result ?? null;
+  return precomputedFamilyScore(row, family);
 }
 
 /** Per-task rates of one family, read from the trial samples already loaded. */
