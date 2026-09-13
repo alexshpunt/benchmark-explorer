@@ -11,6 +11,7 @@ import {
   popoverPosition,
   taskFamily,
   toolTrialCounts,
+  setExplorerData,
 } from "./core.mjs";
 import { Grid, h } from "./vendor/gridjs-6.2.0.mjs";
 
@@ -2384,10 +2385,18 @@ async function load() {
   }
   setStatus("loading", "Loading the latest dataset index…");
   setLoader("Loading benchmark results…", 4, "Reading the dataset index");
-  const indexResponse = await fetch(`${DATASET_ROOT}dataset-index.json`, { cache: "no-store" });
+  const [indexResponse, explorerResponse] = await Promise.all([
+    fetch(`${DATASET_ROOT}dataset-index.json`, { cache: "no-store" }),
+    fetch(`${DATASET_ROOT}explorer-data.json`, { cache: "no-store" }),
+  ]);
   if (!indexResponse.ok) throw new Error(`Dataset index: HTTP ${indexResponse.status}`);
-  const indexText = await indexResponse.text();
+  if (!explorerResponse.ok) throw new Error(`Explorer data: HTTP ${explorerResponse.status}`);
+  const [indexText, explorerData] = await Promise.all([
+    indexResponse.text(),
+    explorerResponse.json(),
+  ]);
   const index = JSON.parse(indexText);
+  setExplorerData(explorerData);
   if (!Array.isArray(index.runs)) throw new Error("Dataset index has no runs");
   const jobs = index.runs.flatMap((run) =>
     ["profiles", "trials", "rounds", "tool-calls"].map((table) => ({
