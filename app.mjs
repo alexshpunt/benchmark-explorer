@@ -2367,18 +2367,18 @@ async function load() {
   }
   setStatus("loading", "Loading the latest dataset index…");
   setLoader("Loading benchmark results…", 4, "Reading the dataset index");
-  const [indexResponse, explorerResponse] = await Promise.all([
+  const [indexResponse, viewsResponse] = await Promise.all([
     fetch(`${DATASET_ROOT}dataset-index.json`, { cache: "no-store" }),
-    fetch(`${DATASET_ROOT}explorer-data.json`, { cache: "no-store" }),
+    fetch(`${DATASET_ROOT}views.json`, { cache: "no-store" }),
   ]);
   if (!indexResponse.ok) throw new Error(`Dataset index: HTTP ${indexResponse.status}`);
-  if (!explorerResponse.ok) throw new Error(`Explorer data: HTTP ${explorerResponse.status}`);
-  const [indexText, explorerData] = await Promise.all([
+  if (!viewsResponse.ok) throw new Error(`Dataset views: HTTP ${viewsResponse.status}`);
+  const [indexText, viewsData] = await Promise.all([
     indexResponse.text(),
-    explorerResponse.json(),
+    viewsResponse.json(),
   ]);
   const index = JSON.parse(indexText);
-  setExplorerData(explorerData);
+  setExplorerData(viewsData);
   if (!Array.isArray(index.runs)) throw new Error("Dataset index has no runs");
   const jobs = index.runs.flatMap((run) =>
     ["profiles", "trials", "rounds", "tool-calls"].map((table) => ({
