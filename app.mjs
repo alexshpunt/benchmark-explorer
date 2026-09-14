@@ -2363,7 +2363,8 @@ async function load() {
     viewsResponse.json(),
   ]);
   const index = JSON.parse(indexText);
-  setViewsData(viewsData);
+  // Show every accepted observation; the stricter official scope stays in the dataset.
+  setViewsData(viewsData, "all");
   if (!Array.isArray(index.runs)) throw new Error("Dataset index has no runs");
   const jobs = index.runs.flatMap((run) =>
     ["profiles", "trials", "rounds", "tool-calls"].map((table) => ({
