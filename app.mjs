@@ -1876,15 +1876,7 @@ function selectionTableHead(selectedCells, label) {
     model.className = "selection-model";
     model.textContent = cell.model;
     button.append(harness, model);
-    button.addEventListener("click", () =>
-      openConfigurationDetails(
-        rowsForCell(cell),
-        cell.overall ? `${cell.model} · every harness` : `${cell.model} · ${cell.label}`,
-        cell.overall
-          ? `Pooled over ${rowsForCell(cell).length} visible configurations`
-          : `${cell.model} · ${cell.harness}@${cell.version ?? "unknown"}`,
-      ),
-    );
+    button.addEventListener("click", () => openConfigurationDetails(rowsForCell(cell)));
     th.append(button);
     headRow.append(th);
   });
