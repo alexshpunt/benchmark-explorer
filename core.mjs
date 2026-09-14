@@ -132,34 +132,14 @@ export function explorerSearch(selection, controls = null) {
   return query ? `?${query}` : "";
 }
 
-const DEFAULT_HARNESSES = {
-  vanilla: "pi-default",
-  opencode: "opencode-default",
-  omp: "oh-my-pi-default",
-  copilot: "github-copilot-cli-default",
-  codex: "codex-cli-default",
-};
-
-function publicAgentHarness(profile) {
-  if (profile.agentFamily === "pi-agent-ide" && profile.harnessFamily === "ide") {
-    return {
-      agentFamily: "pi",
-      agentVersion: profile.harnessVersion ?? null,
-      harnessFamily: "pi-agent-ide",
-      harnessVersion: profile.agentVersion ?? null,
-    };
-  }
-  return {
-    agentFamily: profile.agentFamily ?? null,
-    agentVersion: profile.agentVersion ?? null,
-    harnessFamily:
-      DEFAULT_HARNESSES[profile.harnessFamily] ?? profile.harnessFamily ?? profile.harnessId,
-    harnessVersion: profile.harnessVersion ?? null,
-  };
-}
 function exactIdentity(profile, run) {
   const benchmark = run.definitions?.benchmark;
-  const agentHarness = publicAgentHarness(profile);
+  const agentHarness = {
+    agentFamily: profile.agentFamily ?? null,
+    agentVersion: profile.agentVersion ?? null,
+    harnessFamily: profile.harnessFamily ?? profile.harnessId ?? null,
+    harnessVersion: profile.harnessVersion ?? null,
+  };
   return {
     benchmarkId: benchmark?.id ?? run.contract,
     benchmarkVersion: benchmark?.version ?? null,
