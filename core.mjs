@@ -2,14 +2,14 @@ const metricNames = ["duration", "cost", "tokens"];
 /** Per-trial sample fields for each observed metric. */
 const SAMPLE_FIELDS = { duration: "seconds", cost: "costUsd", tokens: "tokens" };
 const reasoningOrder = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
-let precomputedExplorer = null;
+let precomputedViews = null;
 
 /** Install trusted views produced during Dataset acceptance. */
-export function setExplorerData(data, scope = "official") {
+export function setViewsData(data, scope = "official") {
   if (data?.schemaVersion !== 1 || !data?.[scope]?.leaderboard) {
-    throw Error("Unsupported precomputed Explorer data");
+    throw Error("Unsupported precomputed views");
   }
-  precomputedExplorer = data[scope];
+  precomputedViews = data[scope];
 }
 
 /** Parse newline-delimited JSON, ignoring blank lines. */
@@ -469,7 +469,7 @@ function averageMetric(rows, name) {
 
 /** Return one precomputed task-family row for an accepted configuration. */
 export function precomputedFamilyScore(row, family) {
-  const candidates = precomputedExplorer?.taskFamilies?.[family] ?? [];
+  const candidates = precomputedViews?.taskFamilies?.[family] ?? [];
   return (
     candidates.find((candidate) =>
       candidate.configurationHashes?.some((hash) => row.configurationHashes?.includes(hash)),
@@ -488,11 +488,11 @@ export function precomputedFamilyScore(row, family) {
  * “All”: exact observations roll up by reasoning, benchmark version and family.
  */
 export function aggregateLeaderboard(_index, _profiles, _trials, _rounds, filters = {}) {
-  if (!precomputedExplorer) throw Error("Precomputed Explorer data has not been loaded");
+  if (!precomputedViews) throw Error("Precomputed views have not been loaded");
   const families = filters.taskFamily ?? [];
   const rows = families.length === 1
-    ? precomputedExplorer.taskFamilies[families[0]] ?? []
-    : precomputedExplorer.leaderboard;
+    ? precomputedViews.taskFamilies[families[0]] ?? []
+    : precomputedViews.leaderboard;
   const selected = (actual, expected) => !expected?.length || expected.includes(actual);
   const filtered = rows.filter((row) =>
     selected(row.provider, filters.provider) &&

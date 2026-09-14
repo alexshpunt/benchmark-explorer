@@ -12,7 +12,7 @@ import {
   precomputedFamilyScore,
   taskFamily,
   toolTrialCounts,
-  setExplorerData,
+  setViewsData,
 } from "./core.mjs";
 import { Grid, h } from "./vendor/gridjs-6.2.0.mjs";
 
@@ -2378,7 +2378,7 @@ async function load() {
     viewsResponse.json(),
   ]);
   const index = JSON.parse(indexText);
-  setExplorerData(viewsData);
+  setViewsData(viewsData);
   if (!Array.isArray(index.runs)) throw new Error("Dataset index has no runs");
   const jobs = index.runs.flatMap((run) =>
     ["profiles", "trials", "rounds", "tool-calls"].map((table) => ({
