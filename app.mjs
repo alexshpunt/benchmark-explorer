@@ -352,21 +352,6 @@ function toggleSelection(key) {
   syncUrl(true);
 }
 
-function shortHarnessLabel(harness) {
-  return (
-    {
-      "codex-cli-default": "Codex",
-      "dsh-code": "DSH Code",
-      "dsh-standard": "DSH Standard",
-      "github-copilot-cli-default": "Copilot",
-      "oh-my-pi-default": "Oh My Pi",
-      "opencode-default": "OpenCode",
-      "pi-agent-ide": "Pi IDE",
-      "pi-default": "Pi",
-    }[harness] ?? harness
-  );
-}
-
 function renderMatrix(cells) {
   const root = document.querySelector("#matrix-view");
   root.replaceChildren();
@@ -416,8 +401,8 @@ function renderMatrix(cells) {
     columnButton.type = "button";
     columnButton.className = "matrix-header";
     columnButton.textContent = duplicateHarness
-      ? `${shortHarnessLabel(seriesCell.harness)} ${seriesCell.version}`
-      : shortHarnessLabel(seriesCell.harness);
+      ? `${seriesCell.harness} ${seriesCell.version}`
+      : seriesCell.harness;
     columnButton.title = `Open ${seriesCell.label}`;
     columnButton.addEventListener("click", () =>
       openHarnessDetails(seriesCell.harness, seriesCell.version),
@@ -597,7 +582,7 @@ const COLUMNS = [
     id: "harness",
     name: "Harness",
     tooltip: "Tool environment exposed to the agent. Select a name to inspect its statistics.",
-    cell: (row) => shortHarnessLabel(row.harnessFamily),
+    cell: (row) => row.harnessFamily,
     open: (row) => openHarnessDetails(row.harnessFamily, null),
     detail: {
       lines: [
@@ -1083,7 +1068,7 @@ function configurationListSection(rows, title) {
 
 /** One line that names a configuration in lists and dialogs. */
 function configurationLabel(row) {
-  return `${canonicalModelFamily(row.modelFamily)} · ${shortHarnessLabel(row.harnessFamily)} ${compactVersion(row.harnessVersion)} · ${row.thinking ?? "unknown"}`;
+  return `${canonicalModelFamily(row.modelFamily)} · ${row.harnessFamily} ${compactVersion(row.harnessVersion)} · ${row.thinking ?? "unknown"}`;
 }
 
 /**
@@ -1207,7 +1192,7 @@ function identityParts(row) {
       ? [{ text: row.agentFamily, onClick: () => openAgentDetails(row.agentFamily) }]
       : []),
     {
-      text: `${shortHarnessLabel(row.harnessFamily)} ${compactVersion(row.harnessVersion)}`,
+      text: `${row.harnessFamily} ${compactVersion(row.harnessVersion)}`,
       onClick: () => openHarnessDetails(row.harnessFamily, row.harnessVersion),
     },
     ...(row.thinking
@@ -1398,7 +1383,7 @@ function openHarnessDetails(harness, version) {
   openGroupDetails({
     kind: "harness",
     card: `harness:${harness}@${version ?? ""}`,
-    title: `Harness: ${shortHarnessLabel(harness)}${version ? ` ${compactVersion(version)}` : ""}`,
+    title: `Harness: ${harness}${version ? ` ${compactVersion(version)}` : ""}`,
     identity: version ? `${harness}@${version}` : harness,
     note: "The harness defines which tools exist and how they are described. Two versions of one harness are different configurations and are scored separately.",
     summary: [
@@ -1635,7 +1620,7 @@ function openToolDetails(tool, rows, narrowed) {
       [
         "Scope",
         scopedRow
-          ? `${canonicalModelFamily(scopedRow.modelFamily)} · ${shortHarnessLabel(scopedRow.harnessFamily)} ${compactVersion(scopedRow.harnessVersion)}`
+          ? `${canonicalModelFamily(scopedRow.modelFamily)} · ${scopedRow.harnessFamily} ${compactVersion(scopedRow.harnessVersion)}`
           : "all visible configurations",
       ],
     ]),
@@ -1663,7 +1648,7 @@ function openToolDetails(tool, rows, narrowed) {
       ["Configuration", "Calls/trial", "Used in", "Calls"],
       ranked.slice(0, 40).map((group) => ({
         cells: [
-          `${group.groupModel} · ${shortHarnessLabel(group.groupHarness)} ${compactVersion(group.groupVersion)}`,
+          `${group.groupModel} · ${group.groupHarness} ${compactVersion(group.groupVersion)}`,
           (group.calls / group.trials).toFixed(2),
           `${group.used}/${group.trials}`,
           group.calls.toLocaleString(),
@@ -1886,7 +1871,7 @@ function selectionTableHead(selectedCells, label) {
     harness.className = "selection-harness";
     harness.textContent = cell.overall
       ? "Overall"
-      : `${shortHarnessLabel(cell.harness)} ${compactVersion(cell.version)}`;
+      : `${cell.harness} ${compactVersion(cell.version)}`;
     const model = document.createElement("span");
     model.className = "selection-model";
     model.textContent = cell.model;
