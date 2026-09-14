@@ -1201,6 +1201,33 @@ function identityParts(row) {
   ];
 }
 
+/** Clickable identity parts shared by every row in a configuration scope. */
+function configurationScopeParts(rows) {
+  const [first] = rows;
+  const same = (pick) => rows.every((row) => pick(row) === pick(first));
+  const parts = [];
+  const model = canonicalModelFamily(first.modelFamily);
+  if (same((row) => canonicalModelFamily(row.modelFamily))) {
+    parts.push({ text: model, onClick: () => openModelDetails(model) });
+  }
+  if (first.agentFamily && same((row) => row.agentFamily)) {
+    parts.push({ text: first.agentFamily, onClick: () => openAgentDetails(first.agentFamily) });
+  }
+  if (same((row) => row.harnessFamily) && same((row) => row.harnessVersion)) {
+    parts.push({
+      text: `${first.harnessFamily} ${compactVersion(first.harnessVersion)}`,
+      onClick: () => openHarnessDetails(first.harnessFamily, first.harnessVersion),
+    });
+  }
+  if (first.thinking && same((row) => row.thinking)) {
+    parts.push({
+      text: `thinking ${first.thinking}`,
+      onClick: () => openThinkingDetails(first.thinking),
+    });
+  }
+  return parts.length ? parts : "Configuration selection";
+}
+
 /** Rows visible under the current filters that belong to one model. */
 function rowsForModel(model) {
   return state.configurations.filter((row) => canonicalModelFamily(row.modelFamily) === model);
@@ -1255,7 +1282,7 @@ function openGroupDetails({ kind, card, title, identity, note, summary, rows, fi
 }
 
 /** Everything worth knowing about one configuration. */
-function openConfigurationDetails(rows, title, identity) {
+function openConfigurationDetails(rows) {
   const [first] = rows;
   if (!first) return;
   const single = rows.length === 1 ? first : null;
@@ -1299,10 +1326,11 @@ function openConfigurationDetails(rows, title, identity) {
       },
     ]),
   );
-  // The title names every piece, so nothing repeats on a second line.
+  // One shared identity renderer prevents callers from inventing a second,
+  // conflicting title for the same configuration scope.
   openDetailsDialog(
-    title ?? (single ? identityParts(first) : configurationLabel(first)),
-    identity ?? (single ? null : `${rows.length} configurations`),
+    single ? identityParts(first) : configurationScopeParts(rows),
+    single ? null : `${rows.length} configurations`,
     sections,
   );
   setCard(`config:${scopeToken(rows)}`);
@@ -1383,8 +1411,8 @@ function openHarnessDetails(harness, version) {
   openGroupDetails({
     kind: "harness",
     card: `harness:${harness}@${version ?? ""}`,
-    title: `Harness: ${harness}${version ? ` ${compactVersion(version)}` : ""}`,
-    identity: version ? `${harness}@${version}` : harness,
+    title: `Harness: ${harness}`,
+    identity: version ? `Version ${compactVersion(version)}` : "All visible versions",
     note: "The harness defines which tools exist and how they are described. Two versions of one harness are different configurations and are scored separately.",
     summary: [
       ["Harness", harness],
