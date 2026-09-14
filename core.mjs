@@ -5,11 +5,11 @@ const reasoningOrder = ["off", "minimal", "low", "medium", "high", "xhigh", "max
 let precomputedViews = null;
 
 /** Install trusted views produced during Dataset acceptance. */
-export function setViewsData(data, scope = "official") {
-  if (data?.schemaVersion !== 1 || !data?.[scope]?.leaderboard) {
+export function setViewsData(data) {
+  if (data?.schemaVersion !== 1 || !data?.leaderboard) {
     throw Error("Unsupported precomputed views");
   }
-  precomputedViews = data[scope];
+  precomputedViews = data;
 }
 
 /** Parse newline-delimited JSON, ignoring blank lines. */
