@@ -213,6 +213,7 @@ html {
 body {
   margin: 0;
   min-width: 320px;
+  overflow-x: hidden;
   background: var(--page);
   color: var(--text);
   /* One type scale for the whole page: four steps, one role each. Every
@@ -1149,8 +1150,8 @@ main {
 }
 #results-grid {
   width: 100%;
-  /* The page scrolls, not this container: no max height and no inner scroll. */
-  overflow: visible;
+  /* Keep wide columns inside the leaderboard instead of widening the whole page. */
+  overflow-x: auto;
   /* Same inset as every other block, so the table lines up with the page. */
   padding-inline: var(--page-pad);
   background: transparent;
