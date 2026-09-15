@@ -557,14 +557,23 @@ main {
   left: 0;
   z-index: 2;
   width: 10rem;
-  border-right-color: var(--border-strong);
 }
 .matrix-table thead .matrix-model-column {
   z-index: 3;
   background: var(--surface-muted);
 }
-.matrix-shell.can-scroll-left .matrix-model-column {
-  box-shadow: 10px 0 12px -12px rgb(0 0 0 / 65%);
+.matrix-model-column::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--border-strong);
+  pointer-events: none;
+}
+.matrix-shell.can-scroll-left .matrix-model-column::after {
+  box-shadow: 5px 0 8px rgb(0 0 0 / 28%);
 }
 .matrix-table tbody th {
   width: 10rem;
