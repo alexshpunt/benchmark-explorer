@@ -4,6 +4,32 @@ const SAMPLE_FIELDS = { duration: "seconds", cost: "costUsd", tokens: "tokens" }
 const reasoningOrder = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
 let precomputedViews = null;
 
+/** Resolve the dynamic latest alias to the highest accepted semantic version. */
+export function resolveHarnessVersion(configurations, harness, requestedVersion) {
+  if (requestedVersion !== "latest") return requestedVersion;
+  const versions = configurations
+    .filter((row) => row.harnessFamily === harness && row.harnessVersion)
+    .map((row) => row.harnessVersion);
+  return versions.sort(compareVersions).at(-1) ?? null;
+}
+
+function compareVersions(left, right) {
+  const parse = (version) => {
+    const match = /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?$/.exec(version);
+    return match ? [Number(match[1]), Number(match[2]), Number(match[3]), match[4] ?? null] : null;
+  };
+  const a = parse(left);
+  const b = parse(right);
+  if (!a || !b) return left.localeCompare(right, undefined, { numeric: true });
+  for (let index = 0; index < 3; index += 1) {
+    if (a[index] !== b[index]) return a[index] - b[index];
+  }
+  if (a[3] === b[3]) return 0;
+  if (a[3] === null) return 1;
+  if (b[3] === null) return -1;
+  return a[3].localeCompare(b[3], undefined, { numeric: true });
+}
+
 /** Install trusted views produced during Dataset acceptance. */
 export function setViewsData(data) {
   if (data?.schemaVersion !== 1 || !data?.leaderboard) {

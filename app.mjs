@@ -10,6 +10,7 @@ import {
   parseJsonLines,
   popoverPosition,
   precomputedFamilyScore,
+  resolveHarnessVersion,
   taskFamily,
   toolTrialCounts,
   setViewsData,
@@ -264,7 +265,7 @@ function openCard(value) {
   if (kind === "model") openModelDetails(name);
   else if (kind === "harness") {
     const [family, version = ""] = name.split("@");
-    openHarnessDetails(family, version || null);
+    openHarnessDetails(family, resolveHarnessVersion(state.configurations, family, version || null));
   } else if (kind === "family") openTaskFamilyDetails(name, scopeOf(scope));
   else if (kind === "task") openTaskDetails(name, scopeOf(scope));
   else if (kind === "tool") openToolDetails(name, scopeOf(scope), scope !== "all");
