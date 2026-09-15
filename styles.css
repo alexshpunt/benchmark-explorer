@@ -499,6 +499,21 @@ main {
   overflow-x: auto;
   border: 1px solid var(--border);
   border-radius: var(--radius);
+  scrollbar-color: var(--border-strong) transparent;
+  scrollbar-width: thin;
+}
+.matrix-shell::-webkit-scrollbar {
+  height: 7px;
+}
+.matrix-shell::-webkit-scrollbar-track {
+  background: transparent;
+}
+.matrix-shell::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: var(--border-strong);
+}
+.matrix-shell.can-scroll-right {
+  box-shadow: inset -12px 0 10px -12px rgb(0 0 0 / 45%);
 }
 .matrix-table {
   width: 100%;
@@ -536,6 +551,27 @@ main {
 .matrix-overall-head {
   width: 6rem;
   color: var(--text);
+}
+.matrix-model-column,
+.matrix-overall-column {
+  position: sticky;
+  z-index: 2;
+}
+.matrix-model-column {
+  left: 0;
+  width: 10rem;
+}
+.matrix-overall-column {
+  left: 10rem;
+  background: var(--surface);
+}
+.matrix-table thead .matrix-model-column,
+.matrix-table thead .matrix-overall-column {
+  z-index: 3;
+  background: var(--surface-muted);
+}
+.matrix-shell.can-scroll-left .matrix-overall-column {
+  box-shadow: 10px 0 12px -12px rgb(0 0 0 / 65%);
 }
 .matrix-table tbody th {
   width: 10rem;

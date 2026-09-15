@@ -390,14 +390,16 @@ function renderMatrix(cells) {
   table.style.minWidth = `${10 + series.length * 8}rem`;
   const head = document.createElement("thead");
   const headRow = document.createElement("tr");
-  headRow.append(document.createElement("th"));
+  const modelHead = document.createElement("th");
+  modelHead.className = "matrix-model-column";
+  headRow.append(modelHead);
   for (const seriesCell of series) {
     const th = document.createElement("th");
     th.scope = "col";
     if (seriesCell.overall) {
       // One column for every harness of a model, so it is not a harness itself
       // and has no single harness card to open.
-      th.className = "matrix-overall-head";
+      th.className = "matrix-overall-head matrix-overall-column";
       th.textContent = seriesCell.label;
       th.title = "Every visible harness of this model, pooled per task";
       headRow.append(th);
@@ -427,6 +429,7 @@ function renderMatrix(cells) {
   for (const model of models) {
     const row = document.createElement("tr");
     const heading = document.createElement("th");
+    heading.className = "matrix-model-column";
     heading.scope = "row";
     heading.title = `Open ${model}`;
     const rowButton = document.createElement("button");
@@ -441,6 +444,7 @@ function renderMatrix(cells) {
     row.append(heading);
     for (const seriesCell of series) {
       const td = document.createElement("td");
+      if (seriesCell.overall) td.classList.add("matrix-overall-column");
       const cell = byPosition.get(`${model}\0${seriesCell.label}`);
       if (cell) {
         const button = document.createElement("button");
@@ -468,6 +472,15 @@ function renderMatrix(cells) {
   }
   table.append(head, body);
   root.append(table);
+  const updateScrollEdges = () => {
+    root.classList.toggle("can-scroll-left", root.scrollLeft > 1);
+    root.classList.toggle(
+      "can-scroll-right",
+      root.scrollLeft + root.clientWidth < root.scrollWidth - 1,
+    );
+  };
+  root.onscroll = updateScrollEdges;
+  requestAnimationFrame(updateScrollEdges);
   const min = document.querySelector("#matrix-scale-min");
   const max = document.querySelector("#matrix-scale-max");
   min.textContent = low.toFixed(1);
