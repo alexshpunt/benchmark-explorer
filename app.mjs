@@ -2189,19 +2189,18 @@ function filterOption(parent, filterName, item) {
   const selected = selectedValues(filterName);
   const option = document.createElement("label");
   option.className = "filter-value";
-  const label = document.createElement("span");
-  label.textContent = item.label;
-  const meta = document.createElement("span");
-  meta.className = "filter-value-meta";
-  const count = document.createElement("span");
-  count.textContent = String(item.count ?? 0);
   const check = document.createElement("input");
   check.className = "filter-value-check";
   check.type = "checkbox";
   check.checked = selected.has(item.value);
   check.setAttribute("aria-label", item.label);
-  meta.append(count, check);
-  option.append(label, meta);
+  const label = document.createElement("span");
+  label.className = "filter-value-label";
+  label.textContent = item.label;
+  const count = document.createElement("span");
+  count.className = "filter-value-count";
+  count.textContent = String(item.count ?? 0);
+  option.append(check, label, count);
   check.addEventListener("change", () => {
     if (check.checked) selected.add(item.value);
     else selected.delete(item.value);

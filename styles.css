@@ -1347,16 +1347,14 @@ main {
 .filter-value:hover {
   background: var(--surface-hover);
 }
-.filter-value > span:first-child {
+.filter-value-label {
   min-width: 0;
+  flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.filter-value-meta {
-  display: grid;
-  grid-template-columns: 2.5rem 1.25rem;
-  align-items: center;
+.filter-value-count {
   color: var(--faint);
   text-align: right;
   font-size: var(--text-small);
