@@ -406,14 +406,21 @@ function renderMatrix(cells) {
     const label = `${row.harnessFamily}@${row.harnessVersion ?? "unknown"}`;
     harnessScores.set(label, [...(harnessScores.get(label) ?? []), row]);
   }
-  const scoreByHarness = new Map(
-    [...harnessScores].map(([label, rows]) => [label, aggregateGroupScore(rows).score]),
+  // Ranking keeps measured quality dominant while preferring harnesses that
+  // have evidence for more of the currently visible models.
+  const rankByHarness = new Map(
+    [...harnessScores].map(([label, rows]) => {
+      const score = aggregateGroupScore(rows).score;
+      const testedModels = new Set(rows.map((row) => canonicalModelFamily(row.modelFamily))).size;
+      const completeness = models.length ? testedModels / models.length : 0;
+      return [label, score * (0.75 + 0.25 * completeness)];
+    }),
   );
   const harnesses = [
     ...new Map(cells.filter((cell) => !cell.overall).map((cell) => [cell.label, cell])).values(),
   ].sort(
     (left, right) =>
-      (scoreByHarness.get(right.label) ?? 0) - (scoreByHarness.get(left.label) ?? 0) ||
+      (rankByHarness.get(right.label) ?? 0) - (rankByHarness.get(left.label) ?? 0) ||
       left.label.localeCompare(right.label),
   );
   const series = overall ? [overall, ...harnesses] : harnesses;
