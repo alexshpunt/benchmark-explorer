@@ -387,6 +387,7 @@ function renderMatrix(cells) {
   const span = high - low;
   const table = document.createElement("table");
   table.className = "matrix-table";
+  table.style.minWidth = `${10 + series.length * 8}rem`;
   const head = document.createElement("thead");
   const headRow = document.createElement("tr");
   headRow.append(document.createElement("th"));
@@ -408,9 +409,12 @@ function renderMatrix(cells) {
     const columnButton = document.createElement("button");
     columnButton.type = "button";
     columnButton.className = "matrix-header";
-    columnButton.textContent = duplicateHarness
+    const columnLabel = document.createElement("span");
+    columnLabel.className = "matrix-header-label";
+    columnLabel.textContent = duplicateHarness
       ? `${seriesCell.harness} ${seriesCell.version}`
       : seriesCell.harness;
+    columnButton.append(columnLabel);
     columnButton.title = `Open ${seriesCell.label}`;
     columnButton.addEventListener("click", () =>
       openHarnessDetails(seriesCell.harness, seriesCell.version),
@@ -428,7 +432,10 @@ function renderMatrix(cells) {
     const rowButton = document.createElement("button");
     rowButton.type = "button";
     rowButton.className = "matrix-header";
-    rowButton.textContent = model;
+    const rowLabel = document.createElement("span");
+    rowLabel.className = "matrix-header-label";
+    rowLabel.textContent = model;
+    rowButton.append(rowLabel);
     rowButton.addEventListener("click", () => openModelDetails(model));
     heading.append(rowButton);
     row.append(heading);
