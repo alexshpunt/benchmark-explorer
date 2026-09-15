@@ -19,10 +19,6 @@ import { Grid, h } from "./vendor/gridjs-6.2.0.mjs";
 
 /** Public home of the accepted data, and the base for every provenance link. */
 const DATASET_PAGE = "https://huggingface.co/datasets/alexshpunt/explicit-edit-benchmark";
-/** Public project pages for harnesses that publish one. */
-const HARNESS_PROJECT_URLS = {
-  "pi-agent-ide": "https://github.com/alexshpunt/pi-agent-ide",
-};
 /** Raw file base, used to fetch the data shards. */
 const DATASET_ROOT = `${DATASET_PAGE}/resolve/main/`;
 /**
@@ -1350,17 +1346,10 @@ function groupSummary(rows) {
  * One identity value — a model, an agent, a harness or a reasoning mode — with
  * every configuration behind it, its task outcomes and its provenance.
  */
-function openGroupDetails({ kind, card, title, identity, note, project, summary, rows, filters }) {
+function openGroupDetails({ kind, card, title, identity, note, summary, rows, filters }) {
   const section = detailsSection("How this value is computed");
   const paragraph = document.createElement("p");
   paragraph.textContent = note;
-  if (project) {
-    paragraph.append(" ");
-    const link = document.createElement("a");
-    link.href = project;
-    link.textContent = `Open the ${title.replace(/^[^:]+:\s*/u, "")} project on GitHub.`;
-    paragraph.append(link);
-  }
   const formula = document.createElement("p");
   formula.textContent =
     "Score = coverage × (0.75 × first exact rate + 0.25 × final exact rate), with every trial of the group pooled per task, so a partial run adds evidence instead of pulling the group down.";
@@ -1508,7 +1497,6 @@ function openHarnessDetails(harness, version) {
     title: `Harness: ${harness}`,
     identity: version ? `Version ${compactVersion(version)}` : "All visible versions",
     note: "The harness defines which tools exist and how they are described. Two versions of one harness are different configurations and are scored separately.",
-    project: HARNESS_PROJECT_URLS[harness],
     summary: [
       ["Harness", harness],
       ["Version", version ?? "all visible versions"],

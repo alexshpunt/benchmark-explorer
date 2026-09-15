@@ -13,8 +13,3 @@ test("a harness card shows its version once", () => {
   assert.match(source, /title: `Harness: \$\{harness\}`/u);
   assert.match(source, /identity: version \? `Version \$\{compactVersion\(version\)\}`/u);
 });
-
-test("the pi-agent-ide harness card links to its GitHub project", () => {
-  assert.match(source, /"pi-agent-ide": "https:\/\/github\.com\/alexshpunt\/pi-agent-ide"/u);
-  assert.match(source, /project: HARNESS_PROJECT_URLS\[harness\]/u);
-});
