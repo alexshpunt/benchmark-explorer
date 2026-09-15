@@ -2187,28 +2187,25 @@ function render() {
 
 function filterOption(parent, filterName, item) {
   const selected = selectedValues(filterName);
-  const option = document.createElement("button");
-  option.type = "button";
+  const option = document.createElement("label");
   option.className = "filter-value";
-  option.setAttribute("role", "menuitemcheckbox");
-  option.setAttribute("aria-checked", String(selected.has(item.value)));
   const label = document.createElement("span");
   label.textContent = item.label;
   const meta = document.createElement("span");
   meta.className = "filter-value-meta";
   const count = document.createElement("span");
   count.textContent = String(item.count ?? 0);
-  const check = document.createElement("span");
+  const check = document.createElement("input");
   check.className = "filter-value-check";
-  check.textContent = selected.has(item.value) ? "✓" : "";
+  check.type = "checkbox";
+  check.checked = selected.has(item.value);
+  check.setAttribute("aria-label", item.label);
   meta.append(count, check);
   option.append(label, meta);
-  option.addEventListener("click", () => {
-    if (selected.has(item.value)) selected.delete(item.value);
-    else selected.add(item.value);
+  check.addEventListener("change", () => {
+    if (check.checked) selected.add(item.value);
+    else selected.delete(item.value);
     state.selected.clear();
-    // One choice applies and closes, so the menu never floats over the result.
-    document.querySelector("#filter-all").hidePopover();
     render();
     syncUrl();
   });
@@ -2619,6 +2616,8 @@ document.querySelector("#range-filter-clear").addEventListener("click", () => {
 for (const button of document.querySelectorAll(".filter-button")) {
   button.addEventListener("click", () => {
     placeFilterPopover(button, document.querySelector("#filter-all"));
+    state.filterCategory = null;
+    buildFilterMenus(state.allRows);
     requestAnimationFrame(repositionFilterPopover);
   });
 }

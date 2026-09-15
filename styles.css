@@ -1363,8 +1363,11 @@ main {
   font-variant-numeric: tabular-nums;
 }
 .filter-value-check {
-  color: var(--blue);
-  font-size: var(--text-heading);
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  accent-color: var(--blue);
+  cursor: pointer;
 }
 
 /* ------------------------------------------------------------------- footer */
