@@ -61,7 +61,15 @@ function rampBounds(scores) {
 }
 
 /** Comparison series colours, resolved per theme by styles.css. */
-const COLORS = ["var(--series-1)", "var(--series-2)", "var(--series-3)", "var(--series-4)"];
+const COLORS = ["var(--series-1)", "var(--series-2)", "var(--series-3)", "var(--series-4)"];const FILTER_LABELS = {
+  model: "Model",
+  agent: "Agent",
+  harness: "Harness",
+  harnessVersion: "Harness version",
+  reasoning: "Thinking",
+  benchmark: "Benchmark",
+  taskFamily: "Task family",
+};
 const initialControls = parseExplorerControls(location.search);
 const initialRoute = parseExplorerState(location.search);
 const initialParams = new URLSearchParams(location.search);
@@ -2140,7 +2148,7 @@ function renderActiveFilters() {
       const chip = document.createElement("span");
       chip.className = "active-filter";
       const key = document.createElement("b");
-      key.textContent = name === "reasoning" ? "Thinking" : name;
+      key.textContent = FILTER_LABELS[name] ?? name;
       const label = document.createElement("span");
       label.textContent = value;
       const remove = document.createElement("button");
