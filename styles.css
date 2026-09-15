@@ -635,7 +635,7 @@ main {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0 8px;
+  padding: 0 32px 0 8px;
   border: 0;
   background: transparent;
   color: inherit;
@@ -656,6 +656,40 @@ main {
 }
 .matrix-table tbody .matrix-header {
   justify-content: flex-start;
+}
+.matrix-table th:not(.matrix-model-column):has(.matrix-quick-filter) {
+  position: relative;
+}
+.matrix-quick-filter {
+  position: absolute;
+  top: 50%;
+  right: 5px;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--faint);
+  cursor: pointer;
+  transform: translateY(-50%);
+}
+.matrix-quick-filter:hover,
+.matrix-quick-filter:focus-visible {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+.matrix-quick-filter.active {
+  color: var(--blue);
+}
+.matrix-quick-filter svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
 }
 .matrix-header:hover,
 .matrix-header:focus-visible {

@@ -360,6 +360,36 @@ function toggleSelection(key) {
   syncUrl(true);
 }
 
+function toggleOnlyFilter(name, value) {
+  const values = selectedValues(name);
+  const alreadyExclusive = values.size === 1 && values.has(value);
+  values.clear();
+  if (!alreadyExclusive) values.add(value);
+  state.selected.clear();
+  render();
+  syncUrl();
+}
+
+function matrixFilterButton(name, value, label) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "matrix-quick-filter";
+  const active = selectedValues(name).size === 1 && selectedValues(name).has(value);
+  button.classList.toggle("active", active);
+  button.setAttribute("aria-pressed", String(active));
+  button.setAttribute("aria-label", (active ? "Clear " : "Filter to ") + label);
+  button.title = (active ? "Clear " : "Filter to ") + label;
+  const icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  icon.setAttribute("viewBox", "0 0 24 24");
+  icon.setAttribute("aria-hidden", "true");
+  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  path.setAttribute("d", "M4 6h16M7 12h10M10 18h4");
+  icon.append(path);
+  button.append(icon);
+  button.addEventListener("click", () => toggleOnlyFilter(name, value));
+  return button;
+}
+
 function renderMatrix(cells) {
   const root = document.querySelector("#matrix-view");
   root.replaceChildren();
@@ -422,6 +452,11 @@ function renderMatrix(cells) {
       openHarnessDetails(seriesCell.harness, seriesCell.version),
     );
     th.append(columnButton);
+    const filterName = seriesCell.version ? "harnessVersion" : "harness";
+    const filterValue = seriesCell.version
+      ? seriesCell.harness + "\t" + seriesCell.version
+      : seriesCell.harness;
+    th.append(matrixFilterButton(filterName, filterValue, seriesCell.label));
     headRow.append(th);
   }
   head.append(headRow);
@@ -441,6 +476,7 @@ function renderMatrix(cells) {
     rowButton.append(rowLabel);
     rowButton.addEventListener("click", () => openModelDetails(model));
     heading.append(rowButton);
+    heading.append(matrixFilterButton("model", model, model));
     row.append(heading);
     for (const seriesCell of series) {
       const td = document.createElement("td");
