@@ -354,6 +354,10 @@ main {
   background: var(--surface-hover);
   color: var(--text);
 }
+.resource-link {
+  text-decoration: none;
+  white-space: nowrap;
+}
 .icon-button svg {
   width: 15px;
   height: 15px;
