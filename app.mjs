@@ -399,7 +399,7 @@ function renderMatrix(cells) {
     if (seriesCell.overall) {
       // One column for every harness of a model, so it is not a harness itself
       // and has no single harness card to open.
-      th.className = "matrix-overall-head matrix-overall-column";
+      th.className = "matrix-overall-head";
       th.textContent = seriesCell.label;
       th.title = "Every visible harness of this model, pooled per task";
       headRow.append(th);
@@ -444,7 +444,6 @@ function renderMatrix(cells) {
     row.append(heading);
     for (const seriesCell of series) {
       const td = document.createElement("td");
-      if (seriesCell.overall) td.classList.add("matrix-overall-column");
       const cell = byPosition.get(`${model}\0${seriesCell.label}`);
       if (cell) {
         const button = document.createElement("button");

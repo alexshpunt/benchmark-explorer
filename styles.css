@@ -552,25 +552,17 @@ main {
   width: 6rem;
   color: var(--text);
 }
-.matrix-model-column,
-.matrix-overall-column {
-  position: sticky;
-  z-index: 2;
-}
 .matrix-model-column {
+  position: sticky;
   left: 0;
+  z-index: 2;
   width: 10rem;
 }
-.matrix-overall-column {
-  left: 10rem;
-  background: var(--surface);
-}
-.matrix-table thead .matrix-model-column,
-.matrix-table thead .matrix-overall-column {
+.matrix-table thead .matrix-model-column {
   z-index: 3;
   background: var(--surface-muted);
 }
-.matrix-shell.can-scroll-left .matrix-overall-column {
+.matrix-shell.can-scroll-left .matrix-model-column {
   box-shadow: 10px 0 12px -12px rgb(0 0 0 / 65%);
 }
 .matrix-table tbody th {
