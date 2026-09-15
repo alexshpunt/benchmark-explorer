@@ -401,9 +401,21 @@ function renderMatrix(cells) {
       (overallScore.get(right) ?? 0) - (overallScore.get(left) ?? 0) || left.localeCompare(right),
   );
   const overall = cells.find((cell) => cell.overall);
+  const harnessScores = new Map();
+  for (const row of state.configurations) {
+    const label = `${row.harnessFamily}@${row.harnessVersion ?? "unknown"}`;
+    harnessScores.set(label, [...(harnessScores.get(label) ?? []), row]);
+  }
+  const scoreByHarness = new Map(
+    [...harnessScores].map(([label, rows]) => [label, aggregateGroupScore(rows).score]),
+  );
   const harnesses = [
     ...new Map(cells.filter((cell) => !cell.overall).map((cell) => [cell.label, cell])).values(),
-  ].sort((left, right) => left.label.localeCompare(right.label));
+  ].sort(
+    (left, right) =>
+      (scoreByHarness.get(right.label) ?? 0) - (scoreByHarness.get(left.label) ?? 0) ||
+      left.label.localeCompare(right.label),
+  );
   const series = overall ? [overall, ...harnesses] : harnesses;
   const byPosition = new Map(cells.map((cell) => [`${cell.model}\0${cell.label}`, cell]));
   for (const selected of [...state.selected]) {
