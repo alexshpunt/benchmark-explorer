@@ -4,23 +4,25 @@ import {
   aggregateToolUsage,
   canonicalModelFamily,
   describeDistribution,
+  datasetRevision,
   explorerSearch,
   parseExplorerControls,
   parseExplorerState,
   parseJsonLines,
+  pinnedDatasetRoot,
   popoverPosition,
   precomputedFamilyScore,
   resolveHarnessVersion,
   taskFamily,
   toolTrialCounts,
   setViewsData,
+  validateDatasetSnapshot,
+  verifyPublishedBytes,
 } from "./core.mjs";
 import { Grid, h } from "./vendor/gridjs-6.2.0.mjs";
 
 /** Public home of the accepted data, and the base for every provenance link. */
 const DATASET_PAGE = "https://huggingface.co/datasets/alexshpunt/explicit-edit-benchmark";
-/** Raw file base, used to fetch the data shards. */
-const DATASET_ROOT = `${DATASET_PAGE}/resolve/main/`;
 /**
  * Score scale stops, worst first. Worst reads red, best reads green with an
  * amber midpoint, so the colour carries the same judgement a reader expects.
@@ -76,6 +78,8 @@ const initialRoute = parseExplorerState(location.search);
 const initialParams = new URLSearchParams(location.search);
 const state = {
   index: null,
+  views: null,
+  revision: null,
   profiles: [],
   trials: [],
   rounds: [],
@@ -123,19 +127,11 @@ function hideLoader() {
   document.querySelector("#loader").hidden = true;
 }
 
-async function sha256(buffer) {
-  const digest = await crypto.subtle.digest("SHA-256", buffer);
-  return [...new Uint8Array(digest)].map((value) => value.toString(16).padStart(2, "0")).join("");
-}
-
-async function fetchGzipJsonLines(file, label, progress) {
-  const response = await fetch(new URL(file.path, DATASET_ROOT), { cache: "no-store" });
+async function fetchGzipJsonLines(root, file, label, progress) {
+  const response = await fetch(new URL(file.path, root), { cache: "no-store" });
   if (!response.ok) throw new Error(`${label}: HTTP ${response.status}`);
   const compressed = await response.arrayBuffer();
-  const actualHash = await sha256(compressed);
-  if (file.sha256 && actualHash !== file.sha256) {
-    throw new Error(`${label}: downloaded shard did not match its published checksum`);
-  }
+  await verifyPublishedBytes(compressed, file.sha256);
   const stream = new Blob([compressed]).stream().pipeThrough(new DecompressionStream("gzip"));
   progress();
   return parseJsonLines(await new Response(stream).text());
@@ -1064,7 +1060,8 @@ function openDetailsDialog(title, identity, sections) {
 /** Link to a published file, opened in a new tab. */
 function datasetLink(path, text, title = "") {
   const link = document.createElement("a");
-  link.href = `${DATASET_PAGE}/${path}`;
+  const revision = state.revision ?? "main";
+  link.href = DATASET_PAGE + "/" + path.replace("blob/main/", "blob/" + revision + "/").replace("tree/main/", "tree/" + revision + "/");
   link.target = "_blank";
   link.rel = "noreferrer";
   link.textContent = `${text} ↗`;
@@ -1104,6 +1101,21 @@ function provenanceSection(rows) {
       note.className = "details-note";
       note.textContent = `${counts.trials.toLocaleString()} trials · ${counts.rounds.toLocaleString()} rounds · ${counts.toolCalls.toLocaleString()} tool calls`;
       item.append(note);
+    }
+    const provenance = document.createElement("p");
+    provenance.className = "details-note";
+    const verification = run?.verification ?? "unverified";
+    const execution = run?.official?.executionId ? ` · execution ${run.official.executionId}` : "";
+    provenance.textContent = `${verification}${execution}`;
+    item.append(provenance);
+    if (run?.official?.proofPath) {
+      item.append(
+        datasetLink(
+          `tree/main/${run.official.proofPath}`,
+          "Official proof",
+          "Signed result, attestation, and acceptance receipt",
+        ),
+      );
     }
     list.append(item);
   }
@@ -2451,19 +2463,21 @@ async function load() {
   }
   setStatus("loading", "Loading the latest dataset index…");
   setLoader("Loading benchmark results…", 4, "Reading the dataset index");
-  const [indexResponse, viewsResponse] = await Promise.all([
-    fetch(`${DATASET_ROOT}dataset-index.json`, { cache: "no-store" }),
-    fetch(`${DATASET_ROOT}views.json`, { cache: "no-store" }),
-  ]);
+  const indexResponse = await fetch(DATASET_PAGE + "/resolve/main/dataset-index.json", {
+    cache: "no-store",
+  });
   if (!indexResponse.ok) throw new Error(`Dataset index: HTTP ${indexResponse.status}`);
-  if (!viewsResponse.ok) throw new Error(`Dataset views: HTTP ${viewsResponse.status}`);
-  const [indexText, viewsData] = await Promise.all([
-    indexResponse.text(),
-    viewsResponse.json(),
-  ]);
+  const revision = datasetRevision(indexResponse.headers);
+  const root = pinnedDatasetRoot(DATASET_PAGE, revision);
+  const indexText = await indexResponse.text();
   const index = JSON.parse(indexText);
+  const viewsResponse = await fetch(new URL("views.json", root), { cache: "no-store" });
+  if (!viewsResponse.ok) throw new Error(`Dataset views: HTTP ${viewsResponse.status}`);
+  const viewsBytes = await viewsResponse.arrayBuffer();
+  await verifyPublishedBytes(viewsBytes, index.views?.sha256);
+  const viewsData = JSON.parse(new TextDecoder().decode(viewsBytes));
+  validateDatasetSnapshot(index, viewsData);
   setViewsData(viewsData);
-  if (!Array.isArray(index.runs)) throw new Error("Dataset index has no runs");
   const jobs = index.runs.flatMap((run) =>
     ["profiles", "trials", "rounds", "tool-calls"].map((table) => ({
       table,
@@ -2475,7 +2489,7 @@ async function load() {
   let loaded = 0;
   const groups = await Promise.all(
     jobs.map((job) =>
-      fetchGzipJsonLines(job.file, `${job.runId}/${job.table}`, () => {
+      fetchGzipJsonLines(root, job.file, `${job.runId}/${job.table}`, () => {
         loaded += 1;
         // Shards dominate the wait, so they own most of the bar.
         setLoader(
@@ -2488,18 +2502,23 @@ async function load() {
     ),
   );
   state.index = index;
+  state.revision = revision;
+  state.views = viewsData;
   for (const group of groups) {
     const key = group.table === "tool-calls" ? "toolCalls" : group.table;
     state[key].push(...group.rows);
   }
-  const revision = (await sha256(new TextEncoder().encode(indexText))).slice(0, 10);
   const observations = state.trials.length.toLocaleString();
-  document.querySelector("#revision").textContent = revision;
+  document.querySelector("#revision").textContent = revision.slice(0, 10);
   document.querySelector("#freshness").textContent = new Intl.DateTimeFormat(undefined, {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date());
   document.querySelector("#observation-total").textContent = observations;
+  document.querySelector("#scoring-version").textContent =
+    `v${viewsData.scoring.version}`;
+  document.querySelector("#exclusion-policy").textContent =
+    viewsData.exclusions?.policyId ?? "none";
   setStatus(
     "ready",
     `Live dataset loaded · ${index.runs.length} run${index.runs.length === 1 ? "" : "s"} · ${observations} observations`,
