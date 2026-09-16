@@ -3,6 +3,50 @@ const metricNames = ["duration", "cost", "tokens"];
 const SAMPLE_FIELDS = { duration: "seconds", cost: "costUsd", tokens: "tokens" };
 const reasoningOrder = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
 let precomputedViews = null;
+const COMMIT = /^[a-f0-9]{40}$/u;
+const SHA256 = /^[a-f0-9]{64}$/u;
+
+/** Return the immutable Dataset commit exposed by the Hugging Face resolver. */
+export function datasetRevision(headers) {
+  const revision = headers.get("x-repo-commit");
+  if (!revision || !COMMIT.test(revision)) throw Error("Dataset response has no valid commit header");
+  return revision;
+}
+
+/** Build the only root used after resolving the current Dataset commit. */
+export function pinnedDatasetRoot(datasetPage, revision) {
+  if (!COMMIT.test(revision)) throw Error("Invalid Dataset commit");
+  return datasetPage.replace(/\/$/u, "") + "/resolve/" + revision + "/";
+}
+
+/** Reject views whose public contract is newer or different from this Explorer. */
+export function validateDatasetSnapshot(index, views) {
+  if (index?.schemaVersion !== 1 || !Array.isArray(index.runs))
+    throw Error("Unsupported Dataset index schema");
+  if (views?.schemaVersion !== 1 || !Array.isArray(views.leaderboard))
+    throw Error("Unsupported Dataset views schema");
+  if (views.scoring?.id !== "explicit-edit-score" || ![1, 2].includes(views.scoring?.version))
+    throw Error("Unsupported scoring version");
+  if (views.exclusions) {
+    if (
+      !/^benchmark-exclusions-v[1-9][0-9]*$/u.test(views.exclusions.policyId) ||
+      !SHA256.test(views.exclusions.policyRevision)
+    )
+      throw Error("Unsupported exclusion policy");
+  }
+  return true;
+}
+
+/** Verify exact published bytes before parsing or decompressing them. */
+export async function verifyPublishedBytes(bytes, expectedSha256) {
+  if (!SHA256.test(expectedSha256)) throw Error("Missing published checksum");
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  const actual = [...new Uint8Array(digest)]
+    .map((value) => value.toString(16).padStart(2, "0"))
+    .join("");
+  if (actual !== expectedSha256) throw Error("Downloaded file did not match its published checksum");
+  return true;
+}
 
 /** Resolve the dynamic latest alias to the highest accepted semantic version. */
 export function resolveHarnessVersion(configurations, harness, requestedVersion) {
