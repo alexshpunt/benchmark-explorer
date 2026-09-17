@@ -1354,11 +1354,30 @@ function groupSummary(rows) {
   ];
 }
 
+function sourceLinksSection(links) {
+  const entries = Object.entries(links ?? {}).filter(([, url]) => url);
+  if (!entries.length) return null;
+  const section = detailsSection("Sources");
+  const list = document.createElement("ul");
+  for (const [label, url] of entries) {
+    const item = document.createElement("li");
+    const link = document.createElement("a");
+    link.href = url;
+    link.target = "_blank";
+    link.rel = "noreferrer";
+    link.textContent = `${label} ↗`;
+    item.append(link);
+    list.append(item);
+  }
+  section.append(list);
+  return section;
+}
+
 /**
  * One identity value — a model, an agent, a harness or a reasoning mode — with
  * every configuration behind it, its task outcomes and its provenance.
  */
-function openGroupDetails({ kind, card, title, identity, note, summary, rows, filters }) {
+function openGroupDetails({ kind, card, title, identity, note, summary, rows, filters, links }) {
   const section = detailsSection("How this value is computed");
   const paragraph = document.createElement("p");
   paragraph.textContent = note;
@@ -1367,8 +1386,10 @@ function openGroupDetails({ kind, card, title, identity, note, summary, rows, fi
     "Score = coverage × (0.75 × first exact rate + 0.25 × final exact rate), with every trial of the group pooled per task, so a partial run adds evidence instead of pulling the group down.";
   section.append(paragraph, formula, detailList(summary));
   setCard(card);
+  const sources = sourceLinksSection(links);
   openDetailsDialog(title, identity, [
     section,
+    ...(sources ? [sources] : []),
     configurationListSection(rows, "Visible configurations"),
     taskOutcomeSection(rows),
     provenanceSection(rows),
@@ -1449,6 +1470,7 @@ function openModelDetails(model) {
       ...groupSummary(rows),
     ],
     rows,
+    links: { "Official model page": state.views?.sources?.models?.[model]?.officialPageUrl },
     filters: [["model", model]],
   });
 }
@@ -1503,6 +1525,11 @@ function openThinkingDetails(thinking) {
 function openHarnessDetails(harness, version) {
   const rows = rowsForHarness(harness, version);
   if (!rows.length) return;
+  const source = state.views?.sources?.harnesses?.[harness];
+  const packageUrl =
+    source?.packageUrl && version
+      ? `${source.packageUrl}/v/${encodeURIComponent(version)}`
+      : source?.packageUrl;
   openGroupDetails({
     kind: "harness",
     card: `harness:${harness}@${version ?? ""}`,
@@ -1518,6 +1545,7 @@ function openHarnessDetails(harness, version) {
       ...groupSummary(rows),
     ],
     rows,
+    links: { Repository: source?.repositoryUrl, "npm package": packageUrl },
     filters: [
       ["harness", harness],
       ...(version ? [["harnessVersion", `${harness}\t${version}`]] : []),
