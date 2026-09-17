@@ -9,6 +9,13 @@ test("configuration cards cannot replace the shared title and identity", () => {
   assert.doesNotMatch(source, /function openConfigurationDetails\(rows, title, identity\)/u);
 });
 
+test("model and harness cards render Dataset-provided source links", () => {
+  assert.match(source, /state\.views\?\.sources\?\.models/u);
+  assert.match(source, /state\.views\?\.sources\?\.harnesses/u);
+  assert.match(source, /"Official model page"/u);
+  assert.match(source, /"npm package"/u);
+  assert.match(source, /Repository: source\?\.repositoryUrl/u);
+});
 test("a harness card shows its version once", () => {
   assert.match(source, /title: `Harness: \$\{harness\}`/u);
   assert.match(source, /identity: version \? `Version \$\{compactVersion\(version\)\}`/u);
