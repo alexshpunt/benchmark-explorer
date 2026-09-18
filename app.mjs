@@ -3,6 +3,8 @@ import {
   aggregateLeaderboard,
   aggregateToolUsage,
   canonicalModelFamily,
+  modelRouteIdentity,
+  modelRouteLabel,
   describeDistribution,
   datasetRevision,
   explorerSearch,
@@ -196,6 +198,7 @@ function setCard(value, push = true) {
 function configToken(row) {
   return [
     canonicalModelFamily(row.modelFamily),
+    row.provider ?? "unknown",
     row.harnessFamily,
     row.harnessVersion ?? "",
     row.thinking ?? "",
@@ -208,10 +211,11 @@ const OVERALL = "all";
 /** Rows behind a card scope: "all", one configuration, or every harness. */
 function scopeOf(token) {
   if (!token || token === "all") return state.configurations;
-  const [model, harness, version = "", thinking = ""] = token.split("|");
+  const [model, provider, harness, version = "", thinking = ""] = token.split("|");
   return state.configurations.filter(
     (row) =>
       canonicalModelFamily(row.modelFamily) === model &&
+      (row.provider ?? "unknown") === provider &&
       (harness === "*" || row.harnessFamily === harness) &&
       (version === "" || (row.harnessVersion ?? "") === version) &&
       (thinking === "" || (row.thinking ?? "") === thinking),
@@ -230,9 +234,13 @@ function scopeToken(rows) {
   // Rows that span several harnesses describe a whole model, not one cell.
   const harness =
     new Set(rows.map((row) => row.harnessFamily)).size > 1 ? "*" : first.harnessFamily;
-  return [canonicalModelFamily(first.modelFamily), harness, first.harnessVersion ?? "", ""].join(
-    "|",
-  );
+  return [
+    canonicalModelFamily(first.modelFamily),
+    first.provider ?? "unknown",
+    harness,
+    first.harnessVersion ?? "",
+    "",
+  ].join("|");
 }
 
 /** Reopen whatever card a URL points at. An empty value closes the dialog. */
@@ -258,7 +266,7 @@ function openCard(value) {
     return;
   }
   const [name, scope = "all"] = payload.split("|");
-  if (kind === "model") openModelDetails(name);
+  if (kind === "model") openModelDetails(`${name}\t${scope}`);
   else if (kind === "harness") {
     const [family, version = ""] = name.split("@");
     const badgeVersion = state.views?.badges?.harnessFamily?.[family]?.harnessVersion;
@@ -291,7 +299,7 @@ function matrixCells(configurationRows) {
   const groups = new Map();
   const byModel = new Map();
   for (const row of configurationRows) {
-    const model = canonicalModelFamily(row.modelFamily);
+    const model = modelRouteIdentity(row);
     const key = cellKey(model, row.harnessFamily, row.harnessVersion);
     groups.set(key, [...(groups.get(key) ?? []), row]);
     byModel.set(model, [...(byModel.get(model) ?? []), row]);
@@ -342,14 +350,14 @@ function matrixCells(configurationRows) {
 function rowsForCell(cell) {
   return state.configurations.filter(
     (row) =>
-      canonicalModelFamily(row.modelFamily) === cell.model &&
+      modelRouteIdentity(row) === cell.model &&
       (cell.overall || (row.harnessFamily === cell.harness && row.harnessVersion === cell.version)),
   );
 }
 
 /** Tool-usage key for one configuration row, matching the aggregation key. */
 function cellKeyFromRow(row) {
-  return cellKey(canonicalModelFamily(row.modelFamily), row.harnessFamily, row.harnessVersion);
+  return cellKey(modelRouteIdentity(row), row.harnessFamily, row.harnessVersion);
 }
 
 function toggleSelection(key) {
@@ -413,7 +421,7 @@ function renderMatrix(cells) {
   const rankByHarness = new Map(
     [...harnessScores].map(([label, rows]) => {
       const score = aggregateGroupScore(rows).score;
-      const testedModels = new Set(rows.map((row) => canonicalModelFamily(row.modelFamily))).size;
+      const testedModels = new Set(rows.map(modelRouteIdentity)).size;
       const completeness = models.length ? testedModels / models.length : 0;
       return [label, score * (0.75 + 0.25 * completeness)];
     }),
@@ -487,17 +495,20 @@ function renderMatrix(cells) {
     const heading = document.createElement("th");
     heading.className = "matrix-model-column";
     heading.scope = "row";
-    heading.title = `Open ${model}`;
+    const [modelFamily, provider] = model.split("\t");
+    const modelLabel = `${modelFamily} · ${provider}`;
+    heading.title = `Open ${modelLabel}`;
     const rowButton = document.createElement("button");
     rowButton.type = "button";
     rowButton.className = "matrix-header";
     const rowLabel = document.createElement("span");
     rowLabel.className = "matrix-header-label";
-    rowLabel.textContent = model;
+    rowLabel.textContent = modelLabel;
     rowButton.append(rowLabel);
     rowButton.addEventListener("click", () => openModelDetails(model));
     heading.append(rowButton);
-    heading.append(matrixFilterButton("model", model, model));
+    heading.append(matrixFilterButton("model", modelFamily, modelFamily));
+    heading.append(matrixFilterButton("provider", provider, provider));
     row.append(heading);
     for (const seriesCell of series) {
       const td = document.createElement("td");
@@ -515,7 +526,7 @@ function renderMatrix(cells) {
         const score = cell.score * 100;
         button.style.setProperty("--score-color", scoreColor(span ? (score - low) / span : 1));
         button.textContent = score.toFixed(1);
-        button.title = `${model}\n${cell.label}\n${cell.observations} observations\n${chosen ? "Selected — click to remove" : "Click to compare"}`;
+        button.title = `${modelLabel}\n${cell.label}\n${cell.observations} observations\n${chosen ? "Selected — click to remove" : "Click to compare"}`;
         button.addEventListener("click", () => toggleSelection(cell.key));
         td.append(button);
       } else {
@@ -632,20 +643,35 @@ const COLUMNS = [
   },
   {
     id: "model",
-    name: "Model",
-    tooltip: "Model family. Select a name to inspect its statistics and sources.",
-    cell: (row) => canonicalModelFamily(row.modelFamily),
-    open: (row) => openModelDetails(canonicalModelFamily(row.modelFamily)),
+    name: "Model route",
+    tooltip: "Model family and provider. Select a route to inspect its statistics and sources.",
+    cell: modelRouteLabel,
+    open: (row) => openModelDetails(modelRouteIdentity(row)),
     detail: {
       lines: [
-        "Every accepted configuration recorded for this model under the current filters, and how its Score is built from the observed tasks.",
+        "Every accepted configuration recorded for this model route under the current filters, and how its Score is built from the observed tasks.",
       ],
       inputs: (row) => [
-        ["Provider", row.provider ?? "—"],
+        ["Model family", canonicalModelFamily(row.modelFamily)],
+        ["Provider", row.provider ?? "unknown"],
         ["Model version", row.modelVersion ?? "—"],
       ],
-      identity: (row) => canonicalModelFamily(row.modelFamily),
+      identity: modelRouteIdentity,
       filter: { name: "model", value: (row) => canonicalModelFamily(row.modelFamily) },
+    },
+  },
+  {
+    id: "provider",
+    name: "Provider",
+    tooltip: "Inference provider used for this model route.",
+    cell: (row) => row.provider ?? "unknown",
+    detail: {
+      lines: [
+        "The provider is part of the primary model route because the same model family can behave differently through different serving paths.",
+      ],
+      inputs: (row) => [["Provider", row.provider ?? "unknown"]],
+      identity: (row) => row.provider ?? "unknown",
+      filter: { name: "provider", value: (row) => row.provider ?? "unknown" },
     },
   },
   {
@@ -1168,7 +1194,7 @@ function configurationListSection(rows, title) {
 
 /** One line that names a configuration in lists and dialogs. */
 function configurationLabel(row) {
-  return `${canonicalModelFamily(row.modelFamily)} · ${row.harnessFamily} ${compactVersion(row.harnessVersion)} · ${row.thinking ?? "unknown"}`;
+  return `${modelRouteLabel(row)} · ${row.harnessFamily} ${compactVersion(row.harnessVersion)} · ${row.thinking ?? "unknown"}`;
 }
 
 /**
@@ -1285,9 +1311,10 @@ function actionsSection(actions) {
 
 /** Clickable parts of one configuration: model, agent, harness and reasoning. */
 function identityParts(row) {
-  const model = canonicalModelFamily(row.modelFamily);
+  const model = modelRouteLabel(row);
+  const route = modelRouteIdentity(row);
   return [
-    { text: model, onClick: () => openModelDetails(model) },
+    { text: model, onClick: () => openModelDetails(route) },
     ...(row.agentFamily
       ? [{ text: row.agentFamily, onClick: () => openAgentDetails(row.agentFamily) }]
       : []),
@@ -1306,9 +1333,10 @@ function configurationScopeParts(rows) {
   const [first] = rows;
   const same = (pick) => rows.every((row) => pick(row) === pick(first));
   const parts = [];
-  const model = canonicalModelFamily(first.modelFamily);
-  if (same((row) => canonicalModelFamily(row.modelFamily))) {
-    parts.push({ text: model, onClick: () => openModelDetails(model) });
+  const model = modelRouteLabel(first);
+  const route = modelRouteIdentity(first);
+  if (same(modelRouteIdentity)) {
+    parts.push({ text: model, onClick: () => openModelDetails(route) });
   }
   if (first.agentFamily && same((row) => row.agentFamily)) {
     parts.push({ text: first.agentFamily, onClick: () => openAgentDetails(first.agentFamily) });
@@ -1328,9 +1356,9 @@ function configurationScopeParts(rows) {
   return parts.length ? parts : "Configuration selection";
 }
 
-/** Rows visible under the current filters that belong to one model. */
-function rowsForModel(model) {
-  return state.configurations.filter((row) => canonicalModelFamily(row.modelFamily) === model);
+/** Rows visible under the current filters that belong to one model route. */
+function rowsForModel(route) {
+  return state.configurations.filter((row) => modelRouteIdentity(row) === route);
 }
 
 function rowsForHarness(harness, version) {
@@ -1439,6 +1467,7 @@ function openConfigurationDetails(rows) {
         label: `Filter table to this ${single ? "configuration" : "model and harness"}`,
         filters: [
           ["model", canonicalModelFamily(first.modelFamily)],
+          ["provider", first.provider ?? "unknown"],
           ["harness", first.harnessFamily],
           ...(first.harnessVersion
             ? [["harnessVersion", `${first.harnessFamily}\t${first.harnessVersion}`]]
@@ -1457,18 +1486,20 @@ function openConfigurationDetails(rows) {
   setCard(`config:${scopeToken(rows)}`);
 }
 
-/** One model: every visible configuration it ran, plus its task outcomes. */
-function openModelDetails(model) {
-  const rows = rowsForModel(model);
+/** One model route: every visible configuration it ran, plus its task outcomes. */
+function openModelDetails(route) {
+  const rows = rowsForModel(route);
   if (!rows.length) return;
+  const [model, provider] = route.split("\t");
   openGroupDetails({
-    kind: "model",
-    card: `model:${model}`,
-    title: `Model: ${model}`,
-    identity: rows[0]?.provider ? `Provider ${rows[0].provider}` : "Model family",
-    note: "Every accepted configuration recorded for this model under the current filters. The ranking score pools their trials task by task, so a model with several harnesses is judged across all of them.",
+    kind: "model route",
+    card: `model:${model}|${provider}`,
+    title: `Model route: ${model} · ${provider}`,
+    identity: `Provider ${provider}`,
+    note: "Every accepted configuration recorded for this model route under the current filters. The ranking score pools its trials task by task without mixing another provider serving the same model family.",
     summary: [
-      ["Model", model],
+      ["Model family", model],
+      ["Provider", provider],
       ["Configurations", String(rows.length)],
       ["Harnesses", String(new Set(rows.map((row) => row.harnessFamily)).size)],
       ["Trials", totalTrials(rows)],
@@ -1476,7 +1507,10 @@ function openModelDetails(model) {
     ],
     rows,
     links: { "Official model page": state.views?.sources?.models?.[model]?.officialPageUrl },
-    filters: [["model", model]],
+    filters: [
+      ["model", model],
+      ["provider", provider],
+    ],
   });
 }
 
@@ -1495,7 +1529,7 @@ function openAgentDetails(agent) {
       ["Agent", agent],
       ["Agent version", first?.agentVersion ?? "—"],
       ["Configurations", String(rows.length)],
-      ["Models", String(new Set(rows.map((row) => canonicalModelFamily(row.modelFamily))).size)],
+      ["Model routes", String(new Set(rows.map(modelRouteIdentity)).size)],
       ["Trials", totalTrials(rows)],
       ...groupSummary(rows),
     ],
@@ -1562,7 +1596,7 @@ function openHarnessDetails(harness, version) {
       ["Harness", harness],
       ["Version", version ?? "all visible versions"],
       ["Configurations", String(rows.length)],
-      ["Models", String(new Set(rows.map((row) => canonicalModelFamily(row.modelFamily))).size)],
+      ["Model routes", String(new Set(rows.map(modelRouteIdentity)).size)],
       ["Trials", totalTrials(rows)],
       ...summary,
     ],
@@ -2312,11 +2346,11 @@ function render() {
     activeFilters(),
   );
   const cells = matrixCells(configurationRows);
-  const models = cells.filter((cell) => cell.overall).length;
+  const modelRoutes = cells.filter((cell) => cell.overall).length;
   const harnessColumns = new Set(cells.filter((cell) => !cell.overall).map((cell) => cell.label))
     .size;
   document.querySelector("#summary-context").textContent =
-    `${models} models · ${harnessColumns} harness columns`;
+    `${modelRoutes} model routes · ${harnessColumns} harness columns`;
   state.allRows = aggregateLeaderboard(state.index, state.profiles, state.trials, state.rounds, {});
   state.configurations = configurationRows.toSorted((left, right) => right.score - left.score);
   renderMatrix(cells);
