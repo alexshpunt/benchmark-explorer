@@ -21,6 +21,10 @@ test("a harness card shows its version once", () => {
   assert.match(source, /identity: version \? `Version \$\{compactVersion\(version\)\}`/u);
 });
 
+test("the latest harness route resolves to the version behind the badge", () => {
+  assert.match(source, /version === "latest"/u);
+  assert.match(source, /badges\?\.harnessFamily\?\.\[family\]\?\.harnessVersion/u);
+});
 test("a harness card shows the latest complete version badge beside a selected version", () => {
   assert.match(source, /`Badge score \(latest complete: \$\{badgeVersion\}\)`/u);
   assert.match(source, /summary\[0\]\[0\] = "Version score"/u);

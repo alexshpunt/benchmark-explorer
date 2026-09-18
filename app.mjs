@@ -261,7 +261,12 @@ function openCard(value) {
   if (kind === "model") openModelDetails(name);
   else if (kind === "harness") {
     const [family, version = ""] = name.split("@");
-    openHarnessDetails(family, resolveHarnessVersion(state.configurations, family, version || null));
+    const badgeVersion = state.views?.badges?.harnessFamily?.[family]?.harnessVersion;
+    const resolvedVersion =
+      version === "latest"
+        ? badgeVersion
+        : resolveHarnessVersion(state.configurations, family, version || null);
+    openHarnessDetails(family, resolvedVersion);
   } else if (kind === "family") openTaskFamilyDetails(name, scopeOf(scope));
   else if (kind === "task") openTaskDetails(name, scopeOf(scope));
   else if (kind === "tool") openToolDetails(name, scopeOf(scope), scope !== "all");
