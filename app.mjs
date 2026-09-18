@@ -1530,19 +1530,30 @@ function openHarnessDetails(harness, version) {
     source?.packageUrl && version
       ? `${source.packageUrl}/v/${encodeURIComponent(version)}`
       : source?.packageUrl;
+  const family = state.views?.badges?.harnessFamily?.[harness];
+  const summary = groupSummary(rows);
+  summary[0][0] = version ? "Version score" : "Harness family score";
+  if (version) {
+    summary.unshift([
+      "Harness family score (badge)",
+      family?.score == null ? "—" : (family.score * 100).toFixed(1),
+    ]);
+  }
   openGroupDetails({
     kind: "harness",
     card: `harness:${harness}@${version ?? ""}`,
     title: `Harness: ${harness}`,
     identity: version ? `Version ${compactVersion(version)}` : "All visible versions",
-    note: "The harness defines which tools exist and how they are described. Two versions of one harness are different configurations and are scored separately.",
+    note: version
+      ? "The badge reports the harness family score across all accepted versions. This version has its own score because each harness version is a separate configuration."
+      : "The harness family score combines every accepted version. This is the value shown by the benchmark badge.",
     summary: [
       ["Harness", harness],
       ["Version", version ?? "all visible versions"],
       ["Configurations", String(rows.length)],
       ["Models", String(new Set(rows.map((row) => canonicalModelFamily(row.modelFamily))).size)],
       ["Trials", totalTrials(rows)],
-      ...groupSummary(rows),
+      ...summary,
     ],
     rows,
     links: { Repository: source?.repositoryUrl, "npm package": packageUrl },

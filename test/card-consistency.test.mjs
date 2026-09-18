@@ -20,3 +20,9 @@ test("a harness card shows its version once", () => {
   assert.match(source, /title: `Harness: \$\{harness\}`/u);
   assert.match(source, /identity: version \? `Version \$\{compactVersion\(version\)\}`/u);
 });
+
+test("a versioned harness card distinguishes its family badge from its version score", () => {
+  assert.match(source, /"Harness family score \(badge\)"/u);
+  assert.match(source, /summary\[0\]\[0\] = version \? "Version score" : "Harness family score"/u);
+  assert.match(source, /state\.views\?\.badges\?\.harnessFamily/u);
+});
