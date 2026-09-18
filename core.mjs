@@ -96,6 +96,16 @@ export function canonicalModelFamily(value) {
   return String(value).split("/").at(-1);
 }
 
+/** Return the primary model route identity: model family plus provider. */
+export function modelRouteIdentity(row) {
+  return `${canonicalModelFamily(row.modelFamily)}\t${row.provider ?? "unknown"}`;
+}
+
+/** Return the model route label shown in rankings and drill-downs. */
+export function modelRouteLabel(row) {
+  return `${canonicalModelFamily(row.modelFamily)} · ${row.provider ?? "unknown"}`;
+}
+
 /** Position a floating filter menu inside the viewport next to its trigger. */
 export function popoverPosition(trigger, viewport, menu, gap = 4) {
   const left = Math.max(12, Math.min(trigger.left, viewport.width - menu.width - 12));
@@ -383,7 +393,7 @@ export function aggregateToolUsage(index, profiles, trials, rounds, toolCalls, f
     if (!run || !profile) continue;
     const identity = exactIdentity(profile, run);
     if (!trialMatchesFilters(identity, taskFamily(trial.taskId), filters)) continue;
-    const model = canonicalModelFamily(identity.modelFamily);
+    const model = modelRouteIdentity(identity);
     const key = JSON.stringify([model, identity.harnessFamily, identity.harnessVersion]);
     const group = groups.get(key) ?? {
       key,
@@ -452,7 +462,7 @@ export function toolTrialCounts(index, profiles, trials, rounds, toolCalls, tool
     const identity = exactIdentity(profile, run);
     if (!trialMatchesFilters(identity, taskFamily(trial.taskId), filters)) continue;
     const key = JSON.stringify([
-      canonicalModelFamily(identity.modelFamily),
+      modelRouteIdentity(identity),
       identity.harnessFamily,
       identity.harnessVersion,
     ]);
