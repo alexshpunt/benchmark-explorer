@@ -543,16 +543,19 @@ main {
 .matrix-table thead th {
   min-height: calc(var(--row-height) + 12px);
   padding: 0;
-  background: var(--surface-muted);
+  background: var(--surface);
   color: var(--text);
+  font-family: var(--mono);
   font-size: var(--text-body);
-  font-weight: 600;
+  font-weight: 500;
+  text-align: left;
   white-space: normal;
   overflow-wrap: anywhere;
 }
 /* The overall column summarises the row, so it reads as a label, not a button. */
 .matrix-overall-head {
   width: 6rem;
+  padding-inline: var(--pad-cell) !important;
   color: var(--text);
 }
 .matrix-model-column {
@@ -563,7 +566,7 @@ main {
 }
 .matrix-table thead .matrix-model-column {
   z-index: 3;
-  background: var(--surface-muted);
+  background: var(--surface);
 }
 .matrix-model-column::after {
   content: "";
@@ -635,7 +638,7 @@ main {
   min-height: calc(var(--row-height) + 12px);
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   padding: 0 32px 0 8px;
   border: 0;
   background: transparent;
