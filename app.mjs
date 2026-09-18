@@ -1532,12 +1532,18 @@ function openHarnessDetails(harness, version) {
       : source?.packageUrl;
   const family = state.views?.badges?.harnessFamily?.[harness];
   const summary = groupSummary(rows);
-  summary[0][0] = version ? "Version score" : "Harness family score";
+  const badgeVersion = family?.harnessVersion
+    ? compactVersion(family.harnessVersion)
+    : "no complete version";
+  const badgeSummary = [
+    `Badge score (latest complete: ${badgeVersion})`,
+    family?.score == null ? "—" : (family.score * 100).toFixed(1),
+  ];
   if (version) {
-    summary.unshift([
-      "Harness family score (badge)",
-      family?.score == null ? "—" : (family.score * 100).toFixed(1),
-    ]);
+    summary[0][0] = "Version score";
+    summary.unshift(badgeSummary);
+  } else {
+    summary[0] = badgeSummary;
   }
   openGroupDetails({
     kind: "harness",
@@ -1545,8 +1551,8 @@ function openHarnessDetails(harness, version) {
     title: `Harness: ${harness}`,
     identity: version ? `Version ${compactVersion(version)}` : "All visible versions",
     note: version
-      ? "The badge reports the harness family score across all accepted versions. This version has its own score because each harness version is a separate configuration."
-      : "The harness family score combines every accepted version. This is the value shown by the benchmark badge.",
+      ? "The badge reports the newest harness version with a complete benchmark run. Partial-only versions are ignored. This card also shows the selected version score."
+      : "The badge reports the newest harness version with a complete benchmark run. Partial-only versions are ignored.",
     summary: [
       ["Harness", harness],
       ["Version", version ?? "all visible versions"],
