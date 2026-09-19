@@ -998,6 +998,7 @@ main {
   gap: 2px;
 }
 .column-setting {
+  position: relative;
   min-height: 30px;
   display: grid;
   grid-template-columns: 20px 18px minmax(0, 1fr) 24px 24px;
@@ -1013,6 +1014,25 @@ main {
 }
 .column-setting.dragging {
   opacity: 0.45;
+}
+.column-setting.column-drop-before::before,
+.column-setting.column-drop-after::after {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  left: 2px;
+  right: 2px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--blue);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--blue) 24%, transparent);
+  pointer-events: none;
+}
+.column-setting.column-drop-before::before {
+  top: -2px;
+}
+.column-setting.column-drop-after::after {
+  bottom: -2px;
 }
 .column-drag-handle {
   color: var(--faint);
@@ -1501,6 +1521,30 @@ main {
 }
 .gridjs-th.column-dragging {
   opacity: 0.45;
+}
+.gridjs-th.column-drop-before {
+  box-shadow: inset 3px 0 var(--blue);
+}
+.gridjs-th.column-drop-after {
+  box-shadow: inset -3px 0 var(--blue);
+}
+@media (forced-colors: active) {
+  .column-setting.column-drop-before::before,
+  .column-setting.column-drop-after::after {
+    height: 0;
+    border-top: 2px solid Highlight;
+    background: transparent;
+    box-shadow: none;
+    forced-color-adjust: none;
+  }
+  .gridjs-th.column-drop-before {
+    border-left: 3px solid Highlight !important;
+    box-shadow: none;
+  }
+  .gridjs-th.column-drop-after {
+    border-right: 3px solid Highlight !important;
+    box-shadow: none;
+  }
 }
 
 /* ------------------------------------------------------------ filter popover */

@@ -1105,10 +1105,7 @@ state.columnLayout = normalizeColumnLayout(
 );
 
 function leaderboardColumns() {
-  const hidden = new Set(state.columnLayout.hidden);
-  return state.columnLayout.order
-    .map((id) => COLUMN_BY_ID.get(id))
-    .filter((column) => column && !hidden.has(column.id));
+  return state.columnLayout.order.map((id) => COLUMN_BY_ID.get(id)).filter(Boolean);
 }
 
 function saveColumnLayout() {
@@ -1120,85 +1117,204 @@ function saveColumnLayout() {
   writePreference(LEADERBOARD_LAYOUT_KEY, state.columnLayout);
 }
 
+function clearColumnDropIndicators() {
+  for (const element of document.querySelectorAll(".column-drop-before, .column-drop-after")) {
+    element.classList.remove("column-drop-before", "column-drop-after");
+  }
+}
+
+function showColumnDropIndicator(element, after) {
+  clearColumnDropIndicators();
+  element.classList.add(after ? "column-drop-after" : "column-drop-before");
+}
+
+function reconcileElementOrder(parent, ordered) {
+  const current = [...parent.children].filter((element) => ordered.includes(element));
+  for (const [index, element] of ordered.entries()) {
+    if (current[index] === element) continue;
+    const previousIndex = current.indexOf(element);
+    parent.insertBefore(element, current[index] ?? null);
+    if (previousIndex >= 0) current.splice(previousIndex, 1);
+    current.splice(index, 0, element);
+  }
+}
+
+/** Apply browser column preferences to the existing Grid.js DOM without recreating the table. */
+function applyLeaderboardColumnLayout({ move = null, revealId = null, visibilityId = null } = {}) {
+  const host = document.querySelector("#results-grid");
+  const hidden = new Set(state.columnLayout.hidden);
+  for (const row of host.querySelectorAll("thead tr, tbody tr")) {
+    if (move) {
+      const source = [...row.children].find((cell) => cell.dataset.columnId === move.sourceId);
+      const target = [...row.children].find((cell) => cell.dataset.columnId === move.targetId);
+      if (!source || !target) continue;
+      row.insertBefore(source, move.after ? target.nextElementSibling : target);
+      continue;
+    }
+    if (visibilityId) {
+      const cell = [...row.children].find((child) => child.dataset.columnId === visibilityId);
+      if (!cell) continue;
+      cell.hidden = hidden.has(visibilityId);
+      if (revealId && cell.tagName === "TH" && !cell.hidden) {
+        cell.animate([{ opacity: 0 }, { opacity: 1 }], {
+          duration: 140,
+          easing: "ease-out",
+        });
+      }
+      continue;
+    }
+    const cells = new Map(
+      [...row.children]
+        .filter((cell) => cell.dataset.columnId)
+        .map((cell) => [cell.dataset.columnId, cell]),
+    );
+    const ordered = state.columnLayout.order.map((id) => cells.get(id)).filter(Boolean);
+    reconcileElementOrder(row, ordered);
+    for (const [id, cell] of cells) {
+      const shouldHide = hidden.has(id);
+      if (cell.hidden !== shouldHide) cell.hidden = shouldHide;
+    }
+  }
+  // Layout reconciliation is intentional; it must not schedule another full-table pass.
+  leaderboardTableObserver?.takeRecords();
+}
+
 function moveLeaderboardColumn(sourceId, targetId, after = false) {
   const order = moveColumn(state.columnLayout.order, sourceId, targetId, after);
   if (order.every((id, index) => id === state.columnLayout.order[index])) return;
   state.columnLayout = { ...state.columnLayout, order };
   saveColumnLayout();
-  renderColumnSettings();
-  renderResultsTable(state.rows, true);
+  const move = { sourceId, targetId, after };
+  renderColumnSettings(move);
+  applyLeaderboardColumnLayout({ move });
 }
 
-function renderColumnSettings() {
+function createColumnSetting(id, column, host) {
+  const item = document.createElement("div");
+  item.className = "column-setting";
+  item.draggable = true;
+  item.dataset.columnId = id;
+  const handle = document.createElement("span");
+  handle.className = "column-drag-handle";
+  handle.textContent = "⋮⋮";
+  handle.title = `Drag ${column.name}`;
+  const check = document.createElement("input");
+  check.type = "checkbox";
+  check.disabled = REQUIRED_COLUMN_IDS.includes(id);
+  check.setAttribute("aria-label", `Show ${column.name}`);
+  const name = document.createElement("span");
+  name.textContent = column.name;
+  name.addEventListener("click", () => {
+    if (!check.disabled) check.click();
+  });
+  const moveLeft = document.createElement("button");
+  moveLeft.type = "button";
+  moveLeft.className = "column-move column-move-left";
+  moveLeft.textContent = "←";
+  moveLeft.setAttribute("aria-label", `Move ${column.name} left`);
+  moveLeft.addEventListener("click", () => {
+    const position = state.columnLayout.order.indexOf(id);
+    if (position > 0) moveLeaderboardColumn(id, state.columnLayout.order[position - 1]);
+  });
+  const moveRight = document.createElement("button");
+  moveRight.type = "button";
+  moveRight.className = "column-move column-move-right";
+  moveRight.textContent = "→";
+  moveRight.setAttribute("aria-label", `Move ${column.name} right`);
+  moveRight.addEventListener("click", () => {
+    const position = state.columnLayout.order.indexOf(id);
+    if (position < state.columnLayout.order.length - 1) {
+      moveLeaderboardColumn(id, state.columnLayout.order[position + 1], true);
+    }
+  });
+  item.append(handle, check, name, moveLeft, moveRight);
+  check.addEventListener("change", () => {
+    const nextHidden = new Set(state.columnLayout.hidden);
+    if (check.checked) nextHidden.delete(id);
+    else nextHidden.add(id);
+    state.columnLayout = { ...state.columnLayout, hidden: [...nextHidden] };
+    saveColumnLayout();
+    renderColumnSettings();
+    applyLeaderboardColumnLayout({
+      revealId: check.checked ? id : null,
+      visibilityId: id,
+    });
+  });
+  item.addEventListener("dragstart", (event) => {
+    clearColumnDropIndicators();
+    item.classList.add("dragging");
+    item.setAttribute("aria-grabbed", "true");
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", id);
+  });
+  item.addEventListener("dragend", () => {
+    item.classList.remove("dragging");
+    item.removeAttribute("aria-grabbed");
+    clearColumnDropIndicators();
+  });
+  item.addEventListener("dragover", (event) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    const source = host.querySelector(".column-setting.dragging")?.dataset.columnId;
+    if (source === id) {
+      clearColumnDropIndicators();
+      return;
+    }
+    const after = event.clientY > item.getBoundingClientRect().top + item.offsetHeight / 2;
+    showColumnDropIndicator(item, after);
+  });
+  item.addEventListener("drop", (event) => {
+    event.preventDefault();
+    const after = item.classList.contains("column-drop-after");
+    const sourceId = event.dataTransfer.getData("text/plain");
+    clearColumnDropIndicators();
+    moveLeaderboardColumn(sourceId, id, after);
+  });
+  return item;
+}
+
+function renderColumnSettings(move = null) {
   const host = document.querySelector("#column-settings-list");
   if (!host) return;
-  host.replaceChildren();
+  const focused = host.contains(document.activeElement) ? document.activeElement : null;
   const hidden = new Set(state.columnLayout.hidden);
-  for (const id of state.columnLayout.order) {
+  const existing = new Map(
+    [...host.querySelectorAll(".column-setting")].map((item) => [item.dataset.columnId, item]),
+  );
+  const ordered = [];
+  for (const [position, id] of state.columnLayout.order.entries()) {
     const column = COLUMN_BY_ID.get(id);
     if (!column) continue;
-    const item = document.createElement("div");
-    item.className = "column-setting";
-    item.draggable = true;
-    item.dataset.columnId = id;
-    const handle = document.createElement("span");
-    handle.className = "column-drag-handle";
-    handle.textContent = "⋮⋮";
-    handle.title = `Drag ${column.name}`;
-    const check = document.createElement("input");
-    check.type = "checkbox";
-    check.checked = !hidden.has(id);
-    check.disabled = REQUIRED_COLUMN_IDS.includes(id);
-    check.setAttribute("aria-label", `Show ${column.name}`);
-    const name = document.createElement("span");
-    name.textContent = column.name;
-    name.addEventListener("click", () => {
-      if (!check.disabled) check.click();
+    const item = existing.get(id) ?? createColumnSetting(id, column, host);
+    item.querySelector('input[type="checkbox"]').checked = !hidden.has(id);
+    item.querySelector(".column-move-left").disabled = position === 0;
+    item.querySelector(".column-move-right").disabled =
+      position === state.columnLayout.order.length - 1;
+    ordered.push(item);
+    existing.delete(id);
+  }
+  for (const item of existing.values()) item.remove();
+  const source = move && ordered.find((item) => item.dataset.columnId === move.sourceId);
+  const target = move && ordered.find((item) => item.dataset.columnId === move.targetId);
+  if (source && target) {
+    host.insertBefore(source, move.after ? target.nextElementSibling : target);
+  } else {
+    reconcileElementOrder(host, ordered);
+  }
+  if (focused?.isConnected) focused.focus({ preventScroll: true });
+  if (!host.dataset.dragLeaveBound) {
+    host.dataset.dragLeaveBound = "true";
+    host.addEventListener("dragleave", (event) => {
+      const bounds = host.getBoundingClientRect();
+      if (
+        event.clientX < bounds.left ||
+        event.clientX > bounds.right ||
+        event.clientY < bounds.top ||
+        event.clientY > bounds.bottom
+      ) {
+        clearColumnDropIndicators();
+      }
     });
-    const position = state.columnLayout.order.indexOf(id);
-    const moveLeft = document.createElement("button");
-    moveLeft.type = "button";
-    moveLeft.className = "column-move";
-    moveLeft.textContent = "←";
-    moveLeft.disabled = position === 0;
-    moveLeft.setAttribute("aria-label", `Move ${column.name} left`);
-    moveLeft.addEventListener("click", () =>
-      moveLeaderboardColumn(id, state.columnLayout.order[position - 1]),
-    );
-    const moveRight = document.createElement("button");
-    moveRight.type = "button";
-    moveRight.className = "column-move";
-    moveRight.textContent = "→";
-    moveRight.disabled = position === state.columnLayout.order.length - 1;
-    moveRight.setAttribute("aria-label", `Move ${column.name} right`);
-    moveRight.addEventListener("click", () =>
-      moveLeaderboardColumn(id, state.columnLayout.order[position + 1], true),
-    );
-    item.append(handle, check, name, moveLeft, moveRight);
-    check.addEventListener("change", () => {
-      const nextHidden = new Set(state.columnLayout.hidden);
-      if (check.checked) nextHidden.delete(id);
-      else nextHidden.add(id);
-      state.columnLayout = { ...state.columnLayout, hidden: [...nextHidden] };
-      saveColumnLayout();
-      renderResultsTable(state.rows, true);
-    });
-    item.addEventListener("dragstart", (event) => {
-      item.classList.add("dragging");
-      event.dataTransfer.effectAllowed = "move";
-      event.dataTransfer.setData("text/plain", id);
-    });
-    item.addEventListener("dragend", () => item.classList.remove("dragging"));
-    item.addEventListener("dragover", (event) => {
-      event.preventDefault();
-      event.dataTransfer.dropEffect = "move";
-    });
-    item.addEventListener("drop", (event) => {
-      event.preventDefault();
-      const after = event.clientY > item.getBoundingClientRect().top + item.offsetHeight / 2;
-      moveLeaderboardColumn(event.dataTransfer.getData("text/plain"), id, after);
-    });
-    host.append(item);
   }
 }
 
@@ -2236,21 +2352,11 @@ function rowsForColumn(column, identity) {
   return state.configurations.filter((row) => column.detail.identity(row) === identity);
 }
 
-function displayedLeaderboardRows() {
-  const indexes = [...document.querySelectorAll("#results-grid tbody tr")].map((row) =>
-    Number(row.querySelector(".cell-detail")?.dataset.rowIndex),
-  );
-  return indexes.length === state.rows.length && indexes.every(Number.isInteger)
-    ? indexes.map((index) => state.rows[index])
-    : null;
-}
-
-function renderResultsTable(rows, preserveOrder = false) {
+function renderResultsTable(rows) {
   const host = document.querySelector("#results-grid");
-  const displayedRows = preserveOrder ? displayedLeaderboardRows() : null;
   resultsGrid?.destroy();
   host.replaceChildren();
-  state.rows = displayedRows ?? rows.toSorted((left, right) => right.score - left.score);
+  state.rows = rows.toSorted((left, right) => right.score - left.score);
   const tableColumns = leaderboardColumns();
   const data = state.rows.map((row, index) => [
     ...tableColumns.map((column) => column.cell(row, index)),
@@ -2295,8 +2401,7 @@ function renderResultsTable(rows, preserveOrder = false) {
       search: "results-table-search",
     },
   }).render(host);
-  addHeaderControls(host);
-  addOverflowTitles(host);
+  ensureLeaderboardTable();
 }
 
 /** Truncated cells keep their full value available on hover. */
@@ -2961,10 +3066,18 @@ function placeFilterPopover(button, menu, column = null) {
  * Add the filter button Grid.js does not render. Grid.js builds headers
  * asynchronously, so a mutation observer re-checks whenever they change.
  */
-function ensureHeaderControls() {
-  const host = document.querySelector("#results-grid");
-  if (!host?.querySelector(".gridjs-th:not([data-header-controls])")) return;
-  addHeaderControls(host);
+let leaderboardTableObserver = null;
+let leaderboardTableFrame = null;
+function ensureLeaderboardTable() {
+  if (leaderboardTableFrame != null) return;
+  leaderboardTableFrame = requestAnimationFrame(() => {
+    leaderboardTableFrame = null;
+    const host = document.querySelector("#results-grid");
+    if (!host) return;
+    if (host.querySelector(".gridjs-th:not([data-header-controls])")) addHeaderControls(host);
+    applyLeaderboardColumnLayout();
+    addOverflowTitles(host);
+  });
 }
 
 function addHeaderDrag(th, column) {
@@ -2972,20 +3085,33 @@ function addHeaderDrag(th, column) {
   th.dataset.columnDrag = "true";
   th.draggable = true;
   th.addEventListener("dragstart", (event) => {
+    clearColumnDropIndicators();
     th.classList.add("column-dragging");
     event.dataTransfer.effectAllowed = "move";
     event.dataTransfer.setData("text/plain", column.id);
   });
-  th.addEventListener("dragend", () => th.classList.remove("column-dragging"));
+  th.addEventListener("dragend", () => {
+    th.classList.remove("column-dragging");
+    clearColumnDropIndicators();
+  });
   th.addEventListener("dragover", (event) => {
     event.preventDefault();
     event.dataTransfer.dropEffect = "move";
+    const source = document.querySelector(".gridjs-th.column-dragging")?.dataset.columnId;
+    if (source === column.id) {
+      clearColumnDropIndicators();
+      return;
+    }
+    const after = event.clientX > th.getBoundingClientRect().left + th.offsetWidth / 2;
+    showColumnDropIndicator(th, after);
   });
   th.addEventListener("drop", (event) => {
     event.preventDefault();
     event.stopPropagation();
-    const after = event.clientX > th.getBoundingClientRect().left + th.offsetWidth / 2;
-    moveLeaderboardColumn(event.dataTransfer.getData("text/plain"), column.id, after);
+    const after = th.classList.contains("column-drop-after");
+    const sourceId = event.dataTransfer.getData("text/plain");
+    clearColumnDropIndicators();
+    moveLeaderboardColumn(sourceId, column.id, after);
   });
 }
 
@@ -3126,7 +3252,8 @@ for (const button of document.querySelectorAll(".filter-button")) {
   });
 }
 
-new MutationObserver(ensureHeaderControls).observe(document.querySelector("#results-grid"), {
+leaderboardTableObserver = new MutationObserver(ensureLeaderboardTable);
+leaderboardTableObserver.observe(document.querySelector("#results-grid"), {
   childList: true,
   subtree: true,
 });
@@ -3203,7 +3330,7 @@ document.querySelector("#reset-columns").addEventListener("click", () => {
   state.columnLayout = normalizeColumnLayout(DEFAULT_COLUMN_IDS, null, REQUIRED_COLUMN_IDS);
   saveColumnLayout();
   renderColumnSettings();
-  renderResultsTable(state.rows, true);
+  applyLeaderboardColumnLayout();
 });
 
 renderColumnSettings();
