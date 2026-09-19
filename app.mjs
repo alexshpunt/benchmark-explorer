@@ -892,6 +892,32 @@ const COLUMNS = [
     },
   },
   {
+    id: "totalCost($)",
+    name: "Total cost ($)",
+    tooltip: "Total observed model cost across trials. Missing values remain missing.",
+    cell: (row) => (row.cost.observations ? Number(row.cost.total.toFixed(4)) : null),
+    range: {
+      value: (row) => (row.cost.observations ? row.cost.total : null),
+      decimals: 4,
+      unit: "$",
+    },
+    detail: {
+      lines: [
+        "Total reported model cost across trials. Providers that do not report cost leave those trials out of the total.",
+      ],
+      inputs: (row) => [
+        ["Total cost", row.cost.observations ? `$${row.cost.total.toFixed(4)}` : "—"],
+        ["Reported trials", `${row.cost.observations} of ${row.observations}`],
+      ],
+      samples: (row) => ({
+        values: row.trialSamples.map((sample) => sample.costUsd),
+        label: "Trial cost",
+        unit: "$",
+        decimals: 4,
+      }),
+    },
+  },
+  {
     id: "avgTokens",
     name: "Avg tokens",
     tooltip: "Average observed model tokens per trial. Missing values remain missing.",
@@ -911,6 +937,35 @@ const COLUMNS = [
           ["Reported trials", `${row.tokens.observations} of ${row.observations}`],
         ];
       },
+      samples: (row) => ({
+        values: row.trialSamples.map((sample) => sample.tokens),
+        label: "Trial tokens",
+        unit: "",
+        decimals: 0,
+      }),
+    },
+  },
+  {
+    id: "totalTokens",
+    name: "Total tokens",
+    tooltip: "Total observed model tokens across trials. Missing values remain missing.",
+    cell: (row) => (row.tokens.observations ? Math.round(row.tokens.total) : null),
+    range: {
+      value: (row) => (row.tokens.observations ? row.tokens.total : null),
+      decimals: 0,
+      unit: "tokens",
+    },
+    detail: {
+      lines: [
+        "Total reported tokens across trials, counting input, output and cache tokens where the provider reported them.",
+      ],
+      inputs: (row) => [
+        [
+          "Total tokens",
+          row.tokens.observations ? Math.round(row.tokens.total).toLocaleString() : "—",
+        ],
+        ["Reported trials", `${row.tokens.observations} of ${row.observations}`],
+      ],
       samples: (row) => ({
         values: row.trialSamples.map((sample) => sample.tokens),
         label: "Trial tokens",
