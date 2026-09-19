@@ -133,6 +133,13 @@ export function taskFamily(taskId) {
   return "Other";
 }
 const explorerKeys = ["model", "reasoning", "agent", "harness", "benchmark", "config", "run"];
+const matrixMetricIds = new Set([
+  "score",
+  "firstExact",
+  "avgCost",
+  "avgTokens",
+  "qualityPerDollar",
+]);
 const explorerFilterKeys = [
   "provider",
   "model",
@@ -180,6 +187,7 @@ export function parseExplorerControls(search) {
     reference: params.get("reference")?.trim() || null,
     sortBy: params.get("sort")?.trim() || "score",
     sortDirection: params.get("direction") === "asc" ? "asc" : "desc",
+    matrixMetric: matrixMetricIds.has(params.get("metric")) ? params.get("metric") : "score",
     filters,
   };
 }
@@ -187,7 +195,7 @@ export function parseExplorerControls(search) {
 /**
  * Build a stable query string for a shareable explorer state.
  * @param {Record<string, string | undefined>} selection
- * @param {{comparison?: string, groupBy?: string[], reference?: string | null, sortBy?: string, sortDirection?: string, filters?: Record<string, string[]>} | null} [controls]
+ * @param {{comparison?: string, groupBy?: string[], reference?: string | null, sortBy?: string, sortDirection?: string, matrixMetric?: string, filters?: Record<string, string[]>} | null} [controls]
  */
 export function explorerSearch(selection, controls = null) {
   const params = new URLSearchParams();
@@ -201,6 +209,7 @@ export function explorerSearch(selection, controls = null) {
       for (const dimension of controls.groupBy) params.append("group", dimension);
     }
     if (controls.reference) params.set("reference", controls.reference);
+    if (controls.matrixMetric) params.set("metric", controls.matrixMetric);
     if (controls.sortBy && controls.sortBy !== "score") params.set("sort", controls.sortBy);
     if (controls.sortDirection && controls.sortDirection !== "desc")
       params.set("direction", controls.sortDirection);
@@ -292,6 +301,71 @@ function metricState() {
   return { total: 0, observations: 0 };
 }
 
+/** Return a complete, safe leaderboard layout from browser-provided preferences. */
+export function normalizeColumnLayout(columnIds, saved, requiredIds = []) {
+  const defaults = [...new Set(columnIds)];
+  if (
+    !saved ||
+    typeof saved !== "object" ||
+    saved.version !== 1 ||
+    !Array.isArray(saved.order) ||
+    !Array.isArray(saved.hidden)
+  ) {
+    return { version: 1, order: defaults, hidden: [] };
+  }
+  const known = new Set(defaults);
+  const required = new Set(requiredIds);
+  const order = [
+    ...new Set(saved.order.filter((id) => typeof id === "string" && known.has(id))),
+  ];
+  for (const id of defaults) {
+    if (!order.includes(id)) order.push(id);
+  }
+  const hidden = [
+    ...new Set(
+      saved.hidden.filter(
+        (id) => typeof id === "string" && known.has(id) && !required.has(id),
+      ),
+    ),
+  ];
+  return { version: 1, order, hidden };
+}
+
+/** Move one column before or after another without losing any column ids. */
+export function moveColumn(order, sourceId, targetId, after = false) {
+  if (sourceId === targetId || !order.includes(sourceId) || !order.includes(targetId)) {
+    return [...order];
+  }
+  const moved = order.filter((id) => id !== sourceId);
+  const targetIndex = moved.indexOf(targetId);
+  moved.splice(targetIndex + Number(after), 0, sourceId);
+  return moved;
+}
+
+/** Average one reported metric across rows without treating missing trials as zero. */
+export function observedMetricAverage(rows, metricName) {
+  const observed = rows.reduce(
+    (summary, row) => ({
+      total: summary.total + (row[metricName]?.total ?? 0),
+      observations: summary.observations + (row[metricName]?.observations ?? 0),
+    }),
+    metricState(),
+  );
+  return observed.observations ? observed.total / observed.observations : null;
+}
+
+/** Map a visible metric value to the shared worst-to-best colour scale. */
+export function relativeQualityPosition(value, low, high, higherIsBetter) {
+  const relative = high === low ? 0.5 : (value - low) / (high - low);
+  return higherIsBetter ? relative : 1 - relative;
+}
+
+/** Score points delivered for one dollar of observed average model cost. */
+export function qualityPerDollar(scorePoints, averageCost) {
+  return Number.isFinite(scorePoints) && Number.isFinite(averageCost) && averageCost > 0
+    ? scorePoints / averageCost
+    : null;
+}
 function benchmarkKey(identity) {
   return JSON.stringify([identity.benchmarkId, identity.benchmarkVersion]);
 }

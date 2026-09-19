@@ -106,14 +106,26 @@
         <section class="panel matrix-panel">
           <div class="panel-heading">
             <h2 id="matrix-title">Model route × harness</h2>
-            <p id="summary-context"></p>
+            <div class="matrix-heading-meta">
+              <p id="summary-context"></p>
+              <label class="matrix-metric-control">
+                <span>Metric</span>
+                <select id="matrix-metric" aria-label="Matrix metric">
+                  <option value="score">Score</option>
+                  <option value="firstExact">First exact</option>
+                  <option value="avgCost">Average cost</option>
+                  <option value="avgTokens">Average tokens</option>
+                  <option value="qualityPerDollar">Quality per dollar</option>
+                </select>
+              </label>
+            </div>
           </div>
           <details class="table-guide matrix-guide">
             <summary>How to read this matrix</summary>
             <p>
-              Rows are model routes and columns are harnesses. Each value is the score for that
-              pairing; Overall pools every visible harness for the model per task. A dash means no
-              accepted observations. Select a value to compare configurations, or select a row or
+              Rows are model routes and columns are harnesses. Each value is the selected metric
+              for that pairing; Overall pools every visible harness for the model. A dash means the
+              metric was not reported. Select a value to compare configurations, or select a row or
               column label to open its details.
             </p>
           </details>
@@ -123,7 +135,8 @@
             role="region"
             aria-labelledby="matrix-title"
           ></div>
-          <div class="matrix-legend" aria-label="Score scale from lowest to highest">
+          <div class="matrix-legend" aria-label="Visible metric scale">
+            <span id="matrix-scale-label">Score</span>
             <span id="matrix-scale-min">—</span>
             <span class="matrix-legend-ramp" aria-hidden="true"></span>
             <span id="matrix-scale-max">—</span>
@@ -176,7 +189,20 @@
             Sort or filter all accepted configurations. Select any cell to see how its value is
             built.
           </p>
-          <div id="range-filters" class="active-filters" aria-label="Active range filters"></div>
+          <div class="results-controls">
+            <div id="range-filters" class="active-filters" aria-label="Active range filters"></div>
+            <details id="column-settings" class="column-settings">
+              <summary>Columns</summary>
+              <div class="column-settings-panel">
+                <div class="column-settings-heading">
+                  <strong>Leaderboard columns</strong>
+                  <button id="reset-columns" type="button">Reset</button>
+                </div>
+                <p>Drag or use the arrows to reorder. Clear a checkbox to hide a column.</p>
+                <div id="column-settings-list" class="column-settings-list"></div>
+              </div>
+            </details>
+          </div>
         </div>
         <details class="table-guide">
           <summary>How to read this table</summary>

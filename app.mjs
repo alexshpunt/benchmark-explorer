@@ -5,6 +5,9 @@ import {
   canonicalModelFamily,
   modelRouteIdentity,
   modelRouteLabel,
+  moveColumn,
+  normalizeColumnLayout,
+  observedMetricAverage,
   describeDistribution,
   datasetRevision,
   explorerSearch,
@@ -13,6 +16,8 @@ import {
   parseJsonLines,
   pinnedDatasetRoot,
   popoverPosition,
+  qualityPerDollar,
+  relativeQualityPosition,
   precomputedFamilyScore,
   resolveHarnessVersion,
   taskFamily,
@@ -50,6 +55,9 @@ function scoreColor(position) {
 const SCORE_RAMP_GRADIENT = `linear-gradient(90deg, ${SCORE_RAMP.map((_stop, index) =>
   scoreColor(index / (SCORE_RAMP.length - 1)),
 ).join(", ")})`;
+const REVERSED_SCORE_RAMP_GRADIENT = `linear-gradient(90deg, ${[...SCORE_RAMP]
+  .map((_stop, index) => scoreColor(1 - index / (SCORE_RAMP.length - 1)))
+  .join(", ")})`;
 
 /**
  * Ramp bounds from the visible scores, taken at the 5th and 95th percentile.
@@ -66,7 +74,8 @@ function rampBounds(scores) {
 }
 
 /** Comparison series colours, resolved per theme by styles.css. */
-const COLORS = ["var(--series-1)", "var(--series-2)", "var(--series-3)", "var(--series-4)"];const FILTER_LABELS = {
+const COLORS = ["var(--series-1)", "var(--series-2)", "var(--series-3)", "var(--series-4)"];
+const FILTER_LABELS = {
   model: "Model",
   agent: "Agent",
   harness: "Harness",
@@ -75,9 +84,41 @@ const COLORS = ["var(--series-1)", "var(--series-2)", "var(--series-3)", "var(--
   benchmark: "Benchmark",
   taskFamily: "Task family",
 };
+const LEADERBOARD_LAYOUT_KEY = "benchmark-explorer:leaderboard-layout:v1";
+const MATRIX_METRIC_KEY = "benchmark-explorer:matrix-metric:v1";
+const MATRIX_METRIC_IDS = new Set([
+  "score",
+  "firstExact",
+  "avgCost",
+  "avgTokens",
+  "qualityPerDollar",
+]);
+
+function readPreference(key) {
+  try {
+    return JSON.parse(localStorage.getItem(key));
+  } catch {
+    return null;
+  }
+}
+
+function writePreference(key, value) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // The Explorer still works when storage is disabled or unavailable.
+  }
+}
+
 const initialControls = parseExplorerControls(location.search);
 const initialRoute = parseExplorerState(location.search);
 const initialParams = new URLSearchParams(location.search);
+const storedMatrixMetric = readPreference(MATRIX_METRIC_KEY);
+const initialMatrixMetric = initialParams.has("metric")
+  ? initialControls.matrixMetric
+  : MATRIX_METRIC_IDS.has(storedMatrixMetric)
+    ? storedMatrixMetric
+    : "score";
 const state = {
   index: null,
   views: null,
@@ -104,6 +145,10 @@ const state = {
   /** Column whose range popover is currently open. @type {string | null} */
   rangeColumn: null,
   filterCategory: /** @type {string | null} */ (null),
+  /** Matrix value shown at each model-route and harness intersection. */
+  matrixMetric: initialMatrixMetric,
+  /** Browser-persisted leaderboard column visibility and order. */
+  columnLayout: null,
   /** Card currently open in the dialog, mirrored into the URL. @type {string | null} */
   card: null,
 };
@@ -165,6 +210,7 @@ function currentSearch() {
       reference: null,
       sortBy: "score",
       sortDirection: "desc",
+      matrixMetric: state.matrixMetric,
       filters: Object.fromEntries(
         [...state.filters]
           .filter(([, values]) => values.size > 0)
@@ -295,6 +341,17 @@ function cellKey(model, harness, version) {
   return JSON.stringify([model, harness, version ?? null]);
 }
 
+function matrixMetricSummary(rows, score) {
+  const averageCost = observedMetricAverage(rows, "cost");
+  return {
+    averageCost,
+    averageTokens: observedMetricAverage(rows, "tokens"),
+    costObservations: rows.reduce((sum, row) => sum + row.cost.observations, 0),
+    tokenObservations: rows.reduce((sum, row) => sum + row.tokens.observations, 0),
+    qualityPerDollar: qualityPerDollar(score == null ? null : score * 100, averageCost),
+  };
+}
+
 function matrixCells(configurationRows) {
   const groups = new Map();
   const byModel = new Map();
@@ -321,30 +378,75 @@ function matrixCells(configurationRows) {
       recoveryGain: null,
       duration: mean(rows.map((row) => row.durationSummary.averageCase)),
       observations: rows.reduce((sum, row) => sum + row.observations, 0),
+      ...matrixMetricSummary(rows, group.score),
     };
   });
   return [
     ...overall,
     ...[...groups].map(([key, rows]) => {
       const [model, harness, version] = JSON.parse(key);
+      const score = mean(rows.map((row) => row.score));
       return {
         key,
         model,
         harness,
         version,
         label: `${harness}@${version ?? "unknown"}`,
-        score: mean(rows.map((row) => row.score)),
-        firstExactRate: mean(rows.map((row) => row.firstExactRate)),
+        score,
+        firstExactRate: aggregateGroupScore(rows).firstExactRate,
         finalExactRate: mean(rows.map((row) => row.finalExactRate)),
         recoveryGain: mean(rows.map((row) => row.recoveryGain)),
         duration: mean(
           rows.map((row) => row.durationSummary.averageCase).filter((value) => value != null),
         ),
         observations: rows.reduce((sum, row) => sum + row.observations, 0),
+        ...matrixMetricSummary(rows, score),
       };
     }),
   ];
 }
+
+const MATRIX_METRICS = {
+  score: {
+    label: "Score",
+    higherIsBetter: true,
+    value: (cell) => (cell.score == null ? null : cell.score * 100),
+    format: (value) => value.toFixed(1),
+    detail: (cell) => `Score from ${cell.observations.toLocaleString()} observations`,
+  },
+  firstExact: {
+    label: "First exact",
+    higherIsBetter: true,
+    value: (cell) => (cell.firstExactRate == null ? null : cell.firstExactRate * 100),
+    format: (value) => `${value.toFixed(1)}%`,
+    detail: (cell) =>
+      `First-attempt exact rate from ${cell.observations.toLocaleString()} observations`,
+  },
+  avgCost: {
+    label: "Average cost",
+    higherIsBetter: false,
+    value: (cell) => cell.averageCost,
+    format: (value) => `$${value.toFixed(4)}`,
+    detail: (cell) =>
+      `Average reported cost across ${cell.costObservations.toLocaleString()} trials`,
+  },
+  avgTokens: {
+    label: "Average tokens",
+    higherIsBetter: false,
+    value: (cell) => cell.averageTokens,
+    format: (value) => Math.round(value).toLocaleString(),
+    detail: (cell) =>
+      `Average reported tokens across ${cell.tokenObservations.toLocaleString()} trials`,
+  },
+  qualityPerDollar: {
+    label: "Quality per dollar",
+    higherIsBetter: true,
+    value: (cell) => cell.qualityPerDollar,
+    format: (value) => value.toLocaleString(undefined, { maximumFractionDigits: 1 }),
+    detail: (cell) =>
+      `Score points ÷ $${cell.averageCost.toFixed(4)} average cost across ${cell.costObservations.toLocaleString()} reported trials`,
+  },
+};
 
 /** Filter-visible rows behind one matrix cell. */
 function rowsForCell(cell) {
@@ -403,6 +505,8 @@ function matrixFilterButton(name, value, label) {
 function renderMatrix(cells) {
   const root = document.querySelector("#matrix-view");
   root.replaceChildren();
+  const metric = MATRIX_METRICS[state.matrixMetric];
+  document.querySelector("#matrix-metric").value = state.matrixMetric;
   const overallScore = new Map(
     cells.filter((cell) => cell.overall).map((cell) => [cell.model, cell.score ?? 0]),
   );
@@ -441,9 +545,9 @@ function renderMatrix(cells) {
   // Selected cells take the colour of their series, in selection order, so a
   // cell and the chip that stands for it read as one thing.
   const selectionOrder = new Map([...state.selected].map((key, index) => [key, index]));
-  // The ramp spans the visible scores, so the bars show relative standing.
-  const { low, high } = rampBounds(cells.map((cell) => cell.score * 100));
-  const span = high - low;
+  // The ramp spans observed values for the selected metric. Missing values stay missing.
+  const metricValues = cells.map(metric.value).filter(Number.isFinite);
+  const { low, high } = metricValues.length ? rampBounds(metricValues) : { low: 0, high: 0 };
   const table = document.createElement("table");
   table.className = "matrix-table";
   table.style.minWidth = `${10 + series.length * 8}rem`;
@@ -523,10 +627,19 @@ function renderMatrix(cells) {
         if (chosen) {
           td.style.setProperty("--selection-color", COLORS[position % COLORS.length]);
         }
-        const score = cell.score * 100;
-        button.style.setProperty("--score-color", scoreColor(span ? (score - low) / span : 1));
-        button.textContent = score.toFixed(1);
-        button.title = `${modelLabel}\n${cell.label}\n${cell.observations} observations\n${chosen ? "Selected — click to remove" : "Click to compare"}`;
+        const value = metric.value(cell);
+        if (value == null) {
+          button.textContent = "—";
+          button.classList.add("matrix-value-missing");
+          button.title = `${modelLabel}\n${cell.label}\n${metric.label}: not reported\n${chosen ? "Selected — click to remove" : "Click to compare"}`;
+        } else {
+          button.style.setProperty(
+            "--score-color",
+            scoreColor(relativeQualityPosition(value, low, high, metric.higherIsBetter)),
+          );
+          button.textContent = metric.format(value);
+          button.title = `${modelLabel}\n${cell.label}\n${metric.label}: ${metric.format(value)}\n${metric.detail(cell)}\n${chosen ? "Selected — click to remove" : "Click to compare"}`;
+        }
         button.addEventListener("click", () => toggleSelection(cell.key));
         td.append(button);
       } else {
@@ -550,13 +663,19 @@ function renderMatrix(cells) {
   requestAnimationFrame(updateScrollEdges);
   const min = document.querySelector("#matrix-scale-min");
   const max = document.querySelector("#matrix-scale-max");
-  min.textContent = low.toFixed(1);
-  max.textContent = high.toFixed(1);
-  min.title = "Worst visible score on the scale";
-  max.title = "Best visible score on the scale";
+  const observed = metricValues.length > 0;
+  min.textContent = observed ? metric.format(low) : "—";
+  max.textContent = observed ? metric.format(high) : "—";
+  const lowMeaning = metric.higherIsBetter ? "worst" : "best";
+  const highMeaning = metric.higherIsBetter ? "best" : "worst";
+  min.title = `${metric.label}: ${lowMeaning} visible value`;
+  max.title = `${metric.label}: ${highMeaning} visible value`;
+  document.querySelector("#matrix-scale-label").textContent = metric.label;
   const ramp = document.querySelector(".matrix-legend-ramp");
-  ramp.style.background = SCORE_RAMP_GRADIENT;
-  ramp.title = `Scale runs from ${low.toFixed(1)} (worst) to ${high.toFixed(1)} (best)`;
+  ramp.style.background = metric.higherIsBetter
+    ? SCORE_RAMP_GRADIENT
+    : REVERSED_SCORE_RAMP_GRADIENT;
+  ramp.title = `${metric.label}: lower visible values are ${lowMeaning}, higher values are ${highMeaning}`;
 }
 
 let resultsGrid;
@@ -977,6 +1096,111 @@ const COLUMNS = [
 ];
 
 const COLUMN_BY_ID = new Map(COLUMNS.map((column) => [column.id, column]));
+const DEFAULT_COLUMN_IDS = COLUMNS.map((column) => column.id);
+const REQUIRED_COLUMN_IDS = ["model"];
+state.columnLayout = normalizeColumnLayout(
+  DEFAULT_COLUMN_IDS,
+  readPreference(LEADERBOARD_LAYOUT_KEY),
+  REQUIRED_COLUMN_IDS,
+);
+
+function leaderboardColumns() {
+  const hidden = new Set(state.columnLayout.hidden);
+  return state.columnLayout.order
+    .map((id) => COLUMN_BY_ID.get(id))
+    .filter((column) => column && !hidden.has(column.id));
+}
+
+function saveColumnLayout() {
+  state.columnLayout = normalizeColumnLayout(
+    DEFAULT_COLUMN_IDS,
+    state.columnLayout,
+    REQUIRED_COLUMN_IDS,
+  );
+  writePreference(LEADERBOARD_LAYOUT_KEY, state.columnLayout);
+}
+
+function moveLeaderboardColumn(sourceId, targetId, after = false) {
+  const order = moveColumn(state.columnLayout.order, sourceId, targetId, after);
+  if (order.every((id, index) => id === state.columnLayout.order[index])) return;
+  state.columnLayout = { ...state.columnLayout, order };
+  saveColumnLayout();
+  renderColumnSettings();
+  renderResultsTable(state.rows, true);
+}
+
+function renderColumnSettings() {
+  const host = document.querySelector("#column-settings-list");
+  if (!host) return;
+  host.replaceChildren();
+  const hidden = new Set(state.columnLayout.hidden);
+  for (const id of state.columnLayout.order) {
+    const column = COLUMN_BY_ID.get(id);
+    if (!column) continue;
+    const item = document.createElement("div");
+    item.className = "column-setting";
+    item.draggable = true;
+    item.dataset.columnId = id;
+    const handle = document.createElement("span");
+    handle.className = "column-drag-handle";
+    handle.textContent = "⋮⋮";
+    handle.title = `Drag ${column.name}`;
+    const check = document.createElement("input");
+    check.type = "checkbox";
+    check.checked = !hidden.has(id);
+    check.disabled = REQUIRED_COLUMN_IDS.includes(id);
+    check.setAttribute("aria-label", `Show ${column.name}`);
+    const name = document.createElement("span");
+    name.textContent = column.name;
+    name.addEventListener("click", () => {
+      if (!check.disabled) check.click();
+    });
+    const position = state.columnLayout.order.indexOf(id);
+    const moveLeft = document.createElement("button");
+    moveLeft.type = "button";
+    moveLeft.className = "column-move";
+    moveLeft.textContent = "←";
+    moveLeft.disabled = position === 0;
+    moveLeft.setAttribute("aria-label", `Move ${column.name} left`);
+    moveLeft.addEventListener("click", () =>
+      moveLeaderboardColumn(id, state.columnLayout.order[position - 1]),
+    );
+    const moveRight = document.createElement("button");
+    moveRight.type = "button";
+    moveRight.className = "column-move";
+    moveRight.textContent = "→";
+    moveRight.disabled = position === state.columnLayout.order.length - 1;
+    moveRight.setAttribute("aria-label", `Move ${column.name} right`);
+    moveRight.addEventListener("click", () =>
+      moveLeaderboardColumn(id, state.columnLayout.order[position + 1], true),
+    );
+    item.append(handle, check, name, moveLeft, moveRight);
+    check.addEventListener("change", () => {
+      const nextHidden = new Set(state.columnLayout.hidden);
+      if (check.checked) nextHidden.delete(id);
+      else nextHidden.add(id);
+      state.columnLayout = { ...state.columnLayout, hidden: [...nextHidden] };
+      saveColumnLayout();
+      renderResultsTable(state.rows, true);
+    });
+    item.addEventListener("dragstart", (event) => {
+      item.classList.add("dragging");
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", id);
+    });
+    item.addEventListener("dragend", () => item.classList.remove("dragging"));
+    item.addEventListener("dragover", (event) => {
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "move";
+    });
+    item.addEventListener("drop", (event) => {
+      event.preventDefault();
+      const after = event.clientY > item.getBoundingClientRect().top + item.offsetHeight / 2;
+      moveLeaderboardColumn(event.dataTransfer.getData("text/plain"), id, after);
+    });
+    host.append(item);
+  }
+}
 
 function formatNumber(value, decimals) {
   return decimals ? value.toFixed(decimals) : Math.round(value).toLocaleString();
@@ -2012,19 +2236,34 @@ function rowsForColumn(column, identity) {
   return state.configurations.filter((row) => column.detail.identity(row) === identity);
 }
 
-function renderResultsTable(rows) {
+function displayedLeaderboardRows() {
+  const indexes = [...document.querySelectorAll("#results-grid tbody tr")].map((row) =>
+    Number(row.querySelector(".cell-detail")?.dataset.rowIndex),
+  );
+  return indexes.length === state.rows.length && indexes.every(Number.isInteger)
+    ? indexes.map((index) => state.rows[index])
+    : null;
+}
+
+function renderResultsTable(rows, preserveOrder = false) {
   const host = document.querySelector("#results-grid");
+  const displayedRows = preserveOrder ? displayedLeaderboardRows() : null;
   resultsGrid?.destroy();
   host.replaceChildren();
-  state.rows = rows.toSorted((left, right) => right.score - left.score);
+  state.rows = displayedRows ?? rows.toSorted((left, right) => right.score - left.score);
+  const tableColumns = leaderboardColumns();
   const data = state.rows.map((row, index) => [
-    ...COLUMNS.map((column) => column.cell(row, index)),
+    ...tableColumns.map((column) => column.cell(row, index)),
     index,
   ]);
-  const columns = COLUMNS.map((column) => ({
+  const columns = tableColumns.map((column) => ({
     name: column.name,
     id: column.id,
     sort: column.sort === false ? false : {},
+    attributes: {
+      "data-column-id": column.id,
+      "data-value-kind": column.range || column.id === "#" ? "number" : "text",
+    },
     formatter: (cell, gridRow) => {
       // Sorting moves rows, so the original position travels in a hidden column.
       const index = gridRow.cells.at(-1).data;
@@ -2035,8 +2274,10 @@ function renderResultsTable(rows) {
         {
           type: "button",
           className: "cell-detail",
+          "data-row-index": String(index),
           title: `Explain ${column.name.toLowerCase()}`,
-          onClick: () => (column.open ? column.open(row) : openCellDetails(row, index, column.id)),
+          onClick: () =>
+            column.open ? column.open(row) : openCellDetails(row, index, column.id),
         },
         cell == null ? "—" : String(cell),
       );
@@ -2726,12 +2967,35 @@ function ensureHeaderControls() {
   addHeaderControls(host);
 }
 
+function addHeaderDrag(th, column) {
+  if (th.dataset.columnDrag) return;
+  th.dataset.columnDrag = "true";
+  th.draggable = true;
+  th.addEventListener("dragstart", (event) => {
+    th.classList.add("column-dragging");
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", column.id);
+  });
+  th.addEventListener("dragend", () => th.classList.remove("column-dragging"));
+  th.addEventListener("dragover", (event) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+  });
+  th.addEventListener("drop", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const after = event.clientX > th.getBoundingClientRect().left + th.offsetWidth / 2;
+    moveLeaderboardColumn(event.dataTransfer.getData("text/plain"), column.id, after);
+  });
+}
+
 function addHeaderControls(host) {
   for (const th of host.querySelectorAll(".gridjs-th")) {
     const column = COLUMN_BY_ID.get(th.dataset.columnId);
     if (!column) continue;
     th.dataset.headerControls = "true";
     th.title = column.tooltip;
+    addHeaderDrag(th, column);
     if (!column.range && !column.detail.filter) continue;
     const button = document.createElement("button");
     button.type = "button";
@@ -2904,12 +3168,19 @@ window.addEventListener("popstate", () => {
     Object.entries(controls.filters).map(([name, values]) => [name, new Set(values)]),
   );
   const selected = new Set(params.getAll("select"));
+  const matrixMetric = controls.matrixMetric;
+  const matrixMetricChanged = matrixMetric !== state.matrixMetric;
   // Back and forward usually only move the card. Rebuilding the page for that
   // makes the return crawl next to the instant click that opened it, so the
   // page is redrawn only when the selection or the filters really changed.
-  if (!sameSelection(selected, state.selected) || !sameFilters(filters, state.filters)) {
+  if (
+    matrixMetricChanged ||
+    !sameSelection(selected, state.selected) ||
+    !sameFilters(filters, state.filters)
+  ) {
     state.filters = filters;
     state.selected = selected;
+    state.matrixMetric = matrixMetric;
     render();
   }
   // The card is part of the path too, so Back returns to the previous one.
@@ -2920,6 +3191,22 @@ window.addEventListener("popstate", () => {
     restoringCard = false;
   }
 });
+
+document.querySelector("#matrix-metric").addEventListener("change", (event) => {
+  state.matrixMetric = MATRIX_METRIC_IDS.has(event.target.value) ? event.target.value : "score";
+  writePreference(MATRIX_METRIC_KEY, state.matrixMetric);
+  render();
+  syncUrl();
+});
+
+document.querySelector("#reset-columns").addEventListener("click", () => {
+  state.columnLayout = normalizeColumnLayout(DEFAULT_COLUMN_IDS, null, REQUIRED_COLUMN_IDS);
+  saveColumnLayout();
+  renderColumnSettings();
+  renderResultsTable(state.rows, true);
+});
+
+renderColumnSettings();
 
 load().catch((error) => {
   console.error(error);
