@@ -890,6 +890,9 @@ main {
   color: var(--muted);
   font-size: var(--text-body);
 }
+.matrix-guide {
+  margin: 0 0 var(--gap-head);
+}
 .table-guide summary {
   width: max-content;
   color: var(--blue);
