@@ -1,14 +1,17 @@
 import {
   aggregateGroupScore,
   aggregateLeaderboard,
+  aggregateRunConfigurations,
   aggregateToolUsage,
   canonicalModelFamily,
+  compareHarnessVersions,
   modelRouteIdentity,
   modelRouteLabel,
   moveColumn,
   normalizeColumnLayout,
   observedMetricAverage,
   describeDistribution,
+  latestHarnessConfigurations,
   datasetRevision,
   explorerSearch,
   parseExplorerControls,
@@ -140,6 +143,10 @@ const state = {
   configurations: [],
   /** Every visible configuration, used for filter counts and menus. */
   allRows: [],
+  /** Latest accepted run rows used by compact matrix columns. */
+  compactConfigurations: [],
+  /** Matrix cells retained by key so a hidden compact selection keeps its meaning. */
+  matrixCellCache: new Map(),
   /** Numeric range filters. They narrow the table only, not the whole page. */
   rangeFilters: new Map(),
   /** Column whose range popover is currently open. @type {string | null} */
@@ -147,6 +154,8 @@ const state = {
   filterCategory: /** @type {string | null} */ (null),
   /** Matrix value shown at each model-route and harness intersection. */
   matrixMetric: initialMatrixMetric,
+  /** Harness families whose individual versions are visible in the matrix. */
+  expandedHarnesses: new Set(initialControls.expandedHarnesses),
   /** Browser-persisted leaderboard column visibility and order. */
   columnLayout: null,
   /** Card currently open in the dialog, mirrored into the URL. @type {string | null} */
@@ -211,6 +220,7 @@ function currentSearch() {
       sortBy: "score",
       sortDirection: "desc",
       matrixMetric: state.matrixMetric,
+      expandedHarnesses: [...state.expandedHarnesses],
       filters: Object.fromEntries(
         [...state.filters]
           .filter(([, values]) => values.size > 0)
@@ -248,6 +258,7 @@ function configToken(row) {
     row.harnessFamily,
     row.harnessVersion ?? "",
     row.thinking ?? "",
+    row.runId ?? "",
   ].join("|");
 }
 
@@ -257,14 +268,16 @@ const OVERALL = "all";
 /** Rows behind a card scope: "all", one configuration, or every harness. */
 function scopeOf(token) {
   if (!token || token === "all") return state.configurations;
-  const [model, provider, harness, version = "", thinking = ""] = token.split("|");
-  return state.configurations.filter(
+  const [model, provider, harness, version = "", thinking = "", runId = ""] = token.split("|");
+  const rows = runId ? state.compactConfigurations : state.configurations;
+  return rows.filter(
     (row) =>
       canonicalModelFamily(row.modelFamily) === model &&
       (row.provider ?? "unknown") === provider &&
       (harness === "*" || row.harnessFamily === harness) &&
       (version === "" || (row.harnessVersion ?? "") === version) &&
-      (thinking === "" || (row.thinking ?? "") === thinking),
+      (thinking === "" || (row.thinking ?? "") === thinking) &&
+      (runId === "" || row.runId === runId),
   );
 }
 
@@ -280,12 +293,14 @@ function scopeToken(rows) {
   // Rows that span several harnesses describe a whole model, not one cell.
   const harness =
     new Set(rows.map((row) => row.harnessFamily)).size > 1 ? "*" : first.harnessFamily;
+  const runIds = new Set(rows.map((row) => row.runId).filter(Boolean));
   return [
     canonicalModelFamily(first.modelFamily),
     first.provider ?? "unknown",
     harness,
     first.harnessVersion ?? "",
     "",
+    runIds.size === 1 ? [...runIds][0] : "",
   ].join("|");
 }
 
@@ -304,14 +319,18 @@ function openCard(value) {
     return;
   }
   if (kind === "metric") {
-    const [columnId, token] = payload.split("|");
+    const boundary = payload.indexOf("|");
+    const columnId = boundary < 0 ? payload : payload.slice(0, boundary);
+    const token = boundary < 0 ? "" : payload.slice(boundary + 1);
     const [row] = scopeOf(token);
     const index = row ? state.rows.indexOf(row) : -1;
     if (row && index >= 0) openCellDetails(row, index, columnId);
     else dialog.close();
     return;
   }
-  const [name, scope = "all"] = payload.split("|");
+  const boundary = payload.indexOf("|");
+  const name = boundary < 0 ? payload : payload.slice(0, boundary);
+  const scope = boundary < 0 ? "all" : payload.slice(boundary + 1);
   if (kind === "model") openModelDetails(`${name}\t${scope}`);
   else if (kind === "harness") {
     const [family, version = ""] = name.split("@");
@@ -352,13 +371,34 @@ function matrixMetricSummary(rows, score) {
   };
 }
 
-function matrixCells(configurationRows) {
-  const groups = new Map();
+function matrixCell(model, harness, version, rows, options = {}) {
+  const score = mean(rows.map((row) => row.score).filter((value) => value != null));
+  return {
+    key: options.key ?? cellKey(model, harness, version),
+    columnKey: options.columnKey ?? `${harness}@${version ?? "unknown"}`,
+    model,
+    harness,
+    version,
+    runId: options.runId ?? null,
+    sourceRows: options.sourceRows ?? null,
+    compact: options.compact === true,
+    label: `${harness}@${version ?? "unknown"}`,
+    score,
+    firstExactRate: aggregateGroupScore(rows).firstExactRate,
+    finalExactRate: mean(rows.map((row) => row.finalExactRate).filter((value) => value != null)),
+    recoveryGain: mean(rows.map((row) => row.recoveryGain).filter((value) => value != null)),
+    duration: mean(
+      rows.map((row) => row.durationSummary.averageCase).filter((value) => value != null),
+    ),
+    observations: rows.reduce((sum, row) => sum + row.observations, 0),
+    ...matrixMetricSummary(rows, score),
+  };
+}
+
+function matrixCells(configurationRows, compactRows, expandedHarnesses) {
   const byModel = new Map();
   for (const row of configurationRows) {
     const model = modelRouteIdentity(row);
-    const key = cellKey(model, row.harnessFamily, row.harnessVersion);
-    groups.set(key, [...(groups.get(key) ?? []), row]);
     byModel.set(model, [...(byModel.get(model) ?? []), row]);
   }
   // The overall cell of a model pools its trials task by task, exactly like the
@@ -367,6 +407,7 @@ function matrixCells(configurationRows) {
     const group = aggregateGroupScore(rows);
     return {
       key: cellKey(model, OVERALL, null),
+      columnKey: OVERALL,
       model,
       harness: OVERALL,
       version: null,
@@ -381,29 +422,40 @@ function matrixCells(configurationRows) {
       ...matrixMetricSummary(rows, group.score),
     };
   });
-  return [
-    ...overall,
-    ...[...groups].map(([key, rows]) => {
-      const [model, harness, version] = JSON.parse(key);
-      const score = mean(rows.map((row) => row.score));
-      return {
-        key,
-        model,
-        harness,
-        version,
-        label: `${harness}@${version ?? "unknown"}`,
-        score,
-        firstExactRate: aggregateGroupScore(rows).firstExactRate,
-        finalExactRate: mean(rows.map((row) => row.finalExactRate)),
-        recoveryGain: mean(rows.map((row) => row.recoveryGain)),
-        duration: mean(
-          rows.map((row) => row.durationSummary.averageCase).filter((value) => value != null),
-        ),
-        observations: rows.reduce((sum, row) => sum + row.observations, 0),
-        ...matrixMetricSummary(rows, score),
-      };
-    }),
-  ];
+  const visible = [];
+  const exactGroups = new Map();
+  for (const row of configurationRows) {
+    if (!expandedHarnesses.has(row.harnessFamily)) continue;
+    const model = modelRouteIdentity(row);
+    const key = cellKey(model, row.harnessFamily, row.harnessVersion);
+    exactGroups.set(key, [...(exactGroups.get(key) ?? []), row]);
+  }
+  for (const [key, rows] of exactGroups) {
+    const [model, harness, version] = JSON.parse(key);
+    visible.push(matrixCell(model, harness, version, rows));
+  }
+  const compactGroups = new Map();
+  for (const row of compactRows) {
+    if (expandedHarnesses.has(row.harnessFamily)) continue;
+    const model = modelRouteIdentity(row);
+    const key = JSON.stringify([model, row.harnessFamily]);
+    compactGroups.set(key, [...(compactGroups.get(key) ?? []), row]);
+  }
+  for (const [key, rows] of compactGroups) {
+    const [model, harness] = JSON.parse(key);
+    const version = rows[0]?.harnessVersion ?? null;
+    const runId = rows[0]?.runId ?? null;
+    visible.push(
+      matrixCell(model, harness, version, rows, {
+        columnKey: harness,
+        compact: true,
+        key: JSON.stringify([model, harness, version, runId]),
+        runId,
+        sourceRows: rows,
+      }),
+    );
+  }
+  return [...overall, ...visible];
 }
 
 const MATRIX_METRICS = {
@@ -450,6 +502,7 @@ const MATRIX_METRICS = {
 
 /** Filter-visible rows behind one matrix cell. */
 function rowsForCell(cell) {
+  if (cell.sourceRows) return cell.sourceRows;
   return state.configurations.filter(
     (row) =>
       modelRouteIdentity(row) === cell.model &&
@@ -502,6 +555,32 @@ function matrixFilterButton(name, value, label) {
   return button;
 }
 
+function toggleHarnessExpansion(harness) {
+  if (state.expandedHarnesses.has(harness)) state.expandedHarnesses.delete(harness);
+  else state.expandedHarnesses.add(harness);
+  renderMatrixState(
+    matrixCells(state.configurations, state.compactConfigurations, state.expandedHarnesses),
+  );
+  const nextToggle = [...document.querySelectorAll(".matrix-expand-toggle")].find(
+    (button) => button.dataset.harness === harness,
+  );
+  nextToggle?.focus();
+  syncUrl(true);
+}
+
+function matrixExpansionButton(harness) {
+  const expanded = state.expandedHarnesses.has(harness);
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "matrix-expand-toggle";
+  button.dataset.harness = harness;
+  button.textContent = expanded ? "‹" : "›";
+  button.setAttribute("aria-expanded", String(expanded));
+  button.setAttribute("aria-label", `${expanded ? "Collapse" : "Expand"} ${harness} versions`);
+  button.title = `${expanded ? "Collapse" : "Expand"} ${harness} versions`;
+  button.addEventListener("click", () => toggleHarnessExpansion(harness));
+  return button;
+}
 function renderMatrix(cells) {
   const root = document.querySelector("#matrix-view");
   root.replaceChildren();
@@ -517,31 +596,42 @@ function renderMatrix(cells) {
   const overall = cells.find((cell) => cell.overall);
   const harnessScores = new Map();
   for (const row of state.configurations) {
-    const label = `${row.harnessFamily}@${row.harnessVersion ?? "unknown"}`;
-    harnessScores.set(label, [...(harnessScores.get(label) ?? []), row]);
+    harnessScores.set(row.harnessFamily, [
+      ...(harnessScores.get(row.harnessFamily) ?? []),
+      row,
+    ]);
   }
-  // Ranking keeps measured quality dominant while preferring harnesses that
-  // have evidence for more of the currently visible models.
+  // Ranking keeps measured quality dominant while preferring harness families
+  // that have evidence for more of the currently visible models.
   const rankByHarness = new Map(
-    [...harnessScores].map(([label, rows]) => {
+    [...harnessScores].map(([harness, rows]) => {
       const score = aggregateGroupScore(rows).score;
       const testedModels = new Set(rows.map(modelRouteIdentity)).size;
       const completeness = models.length ? testedModels / models.length : 0;
-      return [label, score * (0.75 + 0.25 * completeness)];
+      return [harness, score * (0.75 + 0.25 * completeness)];
     }),
   );
-  const harnesses = [
-    ...new Map(cells.filter((cell) => !cell.overall).map((cell) => [cell.label, cell])).values(),
-  ].sort(
-    (left, right) =>
-      (rankByHarness.get(right.label) ?? 0) - (rankByHarness.get(left.label) ?? 0) ||
-      left.label.localeCompare(right.label),
-  );
-  const series = overall ? [overall, ...harnesses] : harnesses;
-  const byPosition = new Map(cells.map((cell) => [`${cell.model}\0${cell.label}`, cell]));
-  for (const selected of [...state.selected]) {
-    if (!cells.some((cell) => cell.key === selected)) state.selected.delete(selected);
+  const byHarness = new Map();
+  for (const cell of cells.filter((candidate) => !candidate.overall)) {
+    byHarness.set(cell.harness, [...(byHarness.get(cell.harness) ?? []), cell]);
   }
+  const harnessOrder = [...byHarness.keys()].sort(
+    (left, right) =>
+      (rankByHarness.get(right) ?? 0) - (rankByHarness.get(left) ?? 0) ||
+      left.localeCompare(right),
+  );
+  const harnesses = harnessOrder.flatMap((harness) => {
+    const unique = [
+      ...new Map(byHarness.get(harness).map((cell) => [cell.columnKey, cell])).values(),
+    ];
+    return state.expandedHarnesses.has(harness)
+      ? unique.sort((left, right) =>
+          compareHarnessVersions(left.version ?? "", right.version ?? ""),
+        )
+      : unique.slice(0, 1);
+  });
+  const series = overall ? [overall, ...harnesses] : harnesses;
+  const byPosition = new Map(cells.map((cell) => [`${cell.model}\0${cell.columnKey}`, cell]));
   // Selected cells take the colour of their series, in selection order, so a
   // cell and the chip that stands for it read as one thing.
   const selectionOrder = new Map([...state.selected].map((key, index) => [key, index]));
@@ -568,28 +658,41 @@ function renderMatrix(cells) {
       headRow.append(th);
       continue;
     }
-    const duplicateHarness =
-      series.filter((cell) => cell.harness === seriesCell.harness).length > 1;
-    th.title = seriesCell.label;
+    const expanded = state.expandedHarnesses.has(seriesCell.harness);
+    th.classList.toggle("matrix-expanded-head", expanded);
+    th.title = seriesCell.compact
+      ? `${seriesCell.harness}\nEach model uses its latest available version and accepted run`
+      : seriesCell.label;
     const columnButton = document.createElement("button");
     columnButton.type = "button";
     columnButton.className = "matrix-header";
     const columnLabel = document.createElement("span");
     columnLabel.className = "matrix-header-label";
-    columnLabel.textContent = duplicateHarness
-      ? `${seriesCell.harness} ${seriesCell.version}`
+    columnLabel.textContent = expanded
+      ? `${seriesCell.harness} ${seriesCell.version ?? "unknown"}`
       : seriesCell.harness;
     columnButton.append(columnLabel);
-    columnButton.title = `Open ${seriesCell.label}`;
+    const detailsVersion = seriesCell.compact ? null : seriesCell.version;
+    columnButton.title = `Open ${seriesCell.compact ? seriesCell.harness : seriesCell.label}`;
     columnButton.addEventListener("click", () =>
-      openHarnessDetails(seriesCell.harness, seriesCell.version),
+      openHarnessDetails(seriesCell.harness, detailsVersion),
     );
     th.append(columnButton);
-    const filterName = seriesCell.version ? "harnessVersion" : "harness";
-    const filterValue = seriesCell.version
-      ? seriesCell.harness + "\t" + seriesCell.version
-      : seriesCell.harness;
-    th.append(matrixFilterButton(filterName, filterValue, seriesCell.label));
+    const actions = document.createElement("span");
+    actions.className = "matrix-header-actions";
+    actions.append(matrixExpansionButton(seriesCell.harness));
+    const filterName = seriesCell.compact ? "harness" : "harnessVersion";
+    const filterValue = seriesCell.compact
+      ? seriesCell.harness
+      : seriesCell.harness + "\t" + seriesCell.version;
+    actions.append(
+      matrixFilterButton(
+        filterName,
+        filterValue,
+        seriesCell.compact ? seriesCell.harness : seriesCell.label,
+      ),
+    );
+    th.append(actions);
     headRow.append(th);
   }
   head.append(headRow);
@@ -616,7 +719,7 @@ function renderMatrix(cells) {
     row.append(heading);
     for (const seriesCell of series) {
       const td = document.createElement("td");
-      const cell = byPosition.get(`${model}\0${seriesCell.label}`);
+      const cell = byPosition.get(`${model}\0${seriesCell.columnKey}`);
       if (cell) {
         const button = document.createElement("button");
         button.className = "matrix-cell";
@@ -628,18 +731,22 @@ function renderMatrix(cells) {
           td.style.setProperty("--selection-color", COLORS[position % COLORS.length]);
         }
         const value = metric.value(cell);
+        const source = cell.runId
+          ? `${cell.label}\nRun: ${cell.runId}`
+          : cell.label;
         if (value == null) {
           button.textContent = "—";
           button.classList.add("matrix-value-missing");
-          button.title = `${modelLabel}\n${cell.label}\n${metric.label}: not reported\n${chosen ? "Selected — click to remove" : "Click to compare"}`;
+          button.title = `${modelLabel}\n${source}\n${metric.label}: not reported\n${chosen ? "Selected — click to remove" : "Click to compare"}`;
         } else {
           button.style.setProperty(
             "--score-color",
             scoreColor(relativeQualityPosition(value, low, high, metric.higherIsBetter)),
           );
           button.textContent = metric.format(value);
-          button.title = `${modelLabel}\n${cell.label}\n${metric.label}: ${metric.format(value)}\n${metric.detail(cell)}\n${chosen ? "Selected — click to remove" : "Click to compare"}`;
+          button.title = `${modelLabel}\n${source}\n${metric.label}: ${metric.format(value)}\n${metric.detail(cell)}\n${chosen ? "Selected — click to remove" : "Click to compare"}`;
         }
+        button.setAttribute("aria-label", button.title.replaceAll("\n", ". "));
         button.addEventListener("click", () => toggleSelection(cell.key));
         td.append(button);
       } else {
@@ -711,12 +818,12 @@ const COLUMNS = [
     name: "#",
     tooltip: "Rank among the currently visible configurations, best score first.",
     sort: false,
-    cell: (row, index) => index + 1,
+    cell: (_row, index) => index + 1,
     detail: {
       lines: [
         "Rank is positional: configurations are ordered by Score, best first, and rank reflects only the rows currently visible after filtering.",
       ],
-      inputs: (row, index) => [
+      inputs: (_row, index) => [
         ["Rank", String(index + 1)],
         ["Visible configurations", String(state.rows.length)],
       ],
@@ -2198,7 +2305,12 @@ function openToolDetails(tool, rows, narrowed) {
     activeFilters(),
   );
   const keys = narrowed ? new Set(rows.map(cellKeyFromRow)) : null;
-  const scoped = keys ? all.filter((entry) => keys.has(entry.key)) : all;
+  const runIds = narrowed ? new Set(rows.flatMap((row) => row.runId ?? row.runIds ?? [])) : null;
+  const scoped = keys
+    ? all.filter(
+        (entry) => keys.has(entry.key) && (!runIds.size || runIds.has(entry.runId)),
+      )
+    : all;
   if (!scoped.length) return;
   const calls = scoped.reduce((total, entry) => total + entry.calls, 0);
   const used = scoped.filter((entry) => entry.calls > 0).length;
@@ -2256,12 +2368,14 @@ function openToolDetails(tool, rows, narrowed) {
           group.calls.toLocaleString(),
         ],
         onClick: () => {
-          const rows = rowsForCell({
-            model: group.groupModel,
-            harness: group.groupHarness,
-            version: group.groupVersion,
-          });
-          if (rows.length) openConfigurationDetails(rows);
+          const detailRows = scopedRow?.runId
+            ? rows
+            : rowsForCell({
+                model: group.groupModel,
+                harness: group.groupHarness,
+                version: group.groupVersion,
+              });
+          if (detailRows.length) openConfigurationDetails(detailRows);
         },
       })),
     ),
@@ -2420,20 +2534,6 @@ function pooledFamilyScore(rows, family) {
   return aggregateGroupScore(rows.map((row) => familyScore(row, family)).filter(Boolean));
 }
 
-/** Tasks the benchmark defines in each family, counted from the loaded trials. */
-let familyTotals = null;
-function familyTaskTotals() {
-  familyTotals ??= (() => {
-    const byFamily = new Map();
-    for (const trial of state.trials) {
-      const family = taskFamily(trial.taskId);
-      byFamily.set(family, (byFamily.get(family) ?? new Set()).add(trial.taskId));
-    }
-    return new Map([...byFamily].map(([family, tasks]) => [family, tasks.size]));
-  })();
-  return familyTotals;
-}
-
 function familyEntry(cell, family) {
   const group = pooledFamilyScore(rowsForCell(cell), family);
   return group.score == null
@@ -2484,6 +2584,13 @@ function selectionTableHead(selectedCells, label) {
     model.className = "selection-model";
     model.textContent = cell.model;
     button.append(harness, model);
+    if (cell.runId) {
+      const source = document.createElement("span");
+      source.className = "selection-source";
+      source.textContent = `Run ${cell.runId}`;
+      source.title = `Run ${cell.runId}`;
+      button.append(source);
+    }
     button.addEventListener("click", () => openConfigurationDetails(rowsForCell(cell)));
     th.append(button);
     headRow.append(th);
@@ -2593,7 +2700,9 @@ function compactVersion(version) {
  */
 function usageForCell(cell, usageRows) {
   const keys = new Set(rowsForCell(cell).map(cellKeyFromRow));
-  const mine = usageRows.filter((row) => keys.has(row.key));
+  const mine = usageRows.filter(
+    (row) => keys.has(row.key) && (!cell.runId || row.runId === cell.runId),
+  );
   const trials = mine.reduce((sum, row) => sum + row.trials, 0);
   const calls = mine.reduce((sum, row) => sum + row.calls, 0);
   const byTool = new Map();
@@ -2697,7 +2806,7 @@ function renderToolUsage(selectedCells) {
 }
 function renderComparison(cells) {
   const selectedCells = [...state.selected].flatMap((key) => {
-    const cell = cells.find((candidate) => candidate.key === key);
+    const cell = state.matrixCellCache.get(key) ?? cells.find((candidate) => candidate.key === key);
     return cell ? [cell] : [];
   });
   document.querySelector("#selection-panel").hidden = selectedCells.length === 0;
@@ -2738,6 +2847,17 @@ function renderActiveFilters() {
     }
   }
 }
+function renderMatrixState(cells) {
+  for (const cell of cells) state.matrixCellCache.set(cell.key, cell);
+  const modelRoutes = cells.filter((cell) => cell.overall).length;
+  const harnessColumns = new Set(
+    cells.filter((cell) => !cell.overall).map((cell) => cell.columnKey),
+  ).size;
+  document.querySelector("#summary-context").textContent =
+    `${modelRoutes} model routes · ${harnessColumns} harness columns`;
+  renderMatrix(cells);
+  renderComparison(cells);
+}
 function render() {
   const configurationRows = aggregateLeaderboard(
     state.index,
@@ -2746,16 +2866,29 @@ function render() {
     state.rounds,
     activeFilters(),
   );
-  const cells = matrixCells(configurationRows);
-  const modelRoutes = cells.filter((cell) => cell.overall).length;
-  const harnessColumns = new Set(cells.filter((cell) => !cell.overall).map((cell) => cell.label))
-    .size;
-  document.querySelector("#summary-context").textContent =
-    `${modelRoutes} model routes · ${harnessColumns} harness columns`;
+  const runRows = aggregateRunConfigurations(
+    state.index,
+    state.profiles,
+    state.trials,
+    state.rounds,
+    activeFilters(),
+  );
+  const compactRows = latestHarnessConfigurations(
+    runRows,
+    state.index.runs.map((run) => run.runId),
+  );
   state.allRows = aggregateLeaderboard(state.index, state.profiles, state.trials, state.rounds, {});
   state.configurations = configurationRows.toSorted((left, right) => right.score - left.score);
-  renderMatrix(cells);
-  renderComparison(cells);
+  state.compactConfigurations = compactRows;
+  state.matrixCellCache = new Map(
+    matrixCells(state.configurations, state.compactConfigurations, new Set()).map((cell) => [
+      cell.key,
+      cell,
+    ]),
+  );
+  renderMatrixState(
+    matrixCells(state.configurations, state.compactConfigurations, state.expandedHarnesses),
+  );
   renderResultsTable(configurationRows.filter(matchesRanges));
   renderRangeFilters();
   buildFilterMenus(state.allRows);
@@ -3295,20 +3428,28 @@ window.addEventListener("popstate", () => {
     Object.entries(controls.filters).map(([name, values]) => [name, new Set(values)]),
   );
   const selected = new Set(params.getAll("select"));
+  const expandedHarnesses = new Set(controls.expandedHarnesses);
   const matrixMetric = controls.matrixMetric;
   const matrixMetricChanged = matrixMetric !== state.matrixMetric;
-  // Back and forward usually only move the card. Rebuilding the page for that
-  // makes the return crawl next to the instant click that opened it, so the
-  // page is redrawn only when the selection or the filters really changed.
-  if (
+  const expansionChanged = !sameSelection(expandedHarnesses, state.expandedHarnesses);
+  // Back and forward usually move only the card or harness expansion. Rebuild
+  // all views only when data-bearing controls changed; expansion redraws just
+  // the matrix and its comparison panel.
+  const dataChanged =
     matrixMetricChanged ||
     !sameSelection(selected, state.selected) ||
-    !sameFilters(filters, state.filters)
-  ) {
+    !sameFilters(filters, state.filters);
+  if (dataChanged) {
     state.filters = filters;
     state.selected = selected;
     state.matrixMetric = matrixMetric;
+    state.expandedHarnesses = expandedHarnesses;
     render();
+  } else if (expansionChanged) {
+    state.expandedHarnesses = expandedHarnesses;
+    renderMatrixState(
+      matrixCells(state.configurations, state.compactConfigurations, state.expandedHarnesses),
+    );
   }
   // The card is part of the path too, so Back returns to the previous one.
   restoringCard = true;

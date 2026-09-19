@@ -54,10 +54,37 @@ export function resolveHarnessVersion(configurations, harness, requestedVersion)
   const versions = configurations
     .filter((row) => row.harnessFamily === harness && row.harnessVersion)
     .map((row) => row.harnessVersion);
-  return versions.sort(compareVersions).at(-1) ?? null;
+  return versions.sort(compareHarnessVersions).at(-1) ?? null;
 }
 
-function compareVersions(left, right) {
+/**
+ * Pick the compact harness rows for each model route and family: highest
+ * available version first, then the last accepted run in the pinned Dataset
+ * index. All exact configurations from that selected run remain available.
+ */
+export function latestHarnessConfigurations(rows, acceptedRunIds) {
+  const runOrder = new Map(acceptedRunIds.map((runId, index) => [runId, index]));
+  const latest = new Map();
+  for (const row of rows) {
+    const key = JSON.stringify([modelRouteIdentity(row), row.harnessFamily]);
+    const current = latest.get(key);
+    const versionOrder = current
+      ? compareHarnessVersions(row.harnessVersion ?? "", current.version ?? "")
+      : 1;
+    const rowRun = runOrder.get(row.runId) ?? -1;
+    const currentRun = current ? (runOrder.get(current.runId) ?? -1) : -1;
+    if (!current || versionOrder > 0 || (versionOrder === 0 && rowRun > currentRun)) {
+      latest.set(key, { version: row.harnessVersion, runId: row.runId });
+    }
+  }
+  return rows.filter((row) => {
+    const selected = latest.get(JSON.stringify([modelRouteIdentity(row), row.harnessFamily]));
+    return selected?.version === row.harnessVersion && selected.runId === row.runId;
+  });
+}
+
+/** Compare semantic harness versions, with a numeric fallback for non-semver labels. */
+export function compareHarnessVersions(left, right) {
   const parse = (version) => {
     const match = /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?$/.exec(version);
     return match ? [Number(match[1]), Number(match[2]), Number(match[3]), match[4] ?? null] : null;
@@ -188,6 +215,10 @@ export function parseExplorerControls(search) {
     sortBy: params.get("sort")?.trim() || "score",
     sortDirection: params.get("direction") === "asc" ? "asc" : "desc",
     matrixMetric: matrixMetricIds.has(params.get("metric")) ? params.get("metric") : "score",
+    expandedHarnesses: params
+      .getAll("expandHarness")
+      .map((value) => value.trim())
+      .filter(Boolean),
     filters,
   };
 }
@@ -195,7 +226,7 @@ export function parseExplorerControls(search) {
 /**
  * Build a stable query string for a shareable explorer state.
  * @param {Record<string, string | undefined>} selection
- * @param {{comparison?: string, groupBy?: string[], reference?: string | null, sortBy?: string, sortDirection?: string, matrixMetric?: string, filters?: Record<string, string[]>} | null} [controls]
+ * @param {{comparison?: string, groupBy?: string[], reference?: string | null, sortBy?: string, sortDirection?: string, matrixMetric?: string, expandedHarnesses?: string[], filters?: Record<string, string[]>} | null} [controls]
  */
 export function explorerSearch(selection, controls = null) {
   const params = new URLSearchParams();
@@ -210,6 +241,9 @@ export function explorerSearch(selection, controls = null) {
     }
     if (controls.reference) params.set("reference", controls.reference);
     if (controls.matrixMetric) params.set("metric", controls.matrixMetric);
+    for (const harness of [...new Set(controls.expandedHarnesses ?? [])].sort()) {
+      params.append("expandHarness", harness);
+    }
     if (controls.sortBy && controls.sortBy !== "score") params.set("sort", controls.sortBy);
     if (controls.sortDirection && controls.sortDirection !== "desc")
       params.set("direction", controls.sortDirection);
@@ -277,20 +311,6 @@ function trialMatchesFilters(identity, family, filters) {
     ) &&
     matchesFilter(identity.thinking, filters.reasoning) &&
     matchesFilter(family, filters.taskFamily)
-  );
-}
-
-function compareNullable(left, right, direction, selector) {
-  const leftValue = selector(left);
-  const rightValue = selector(right);
-  if (leftValue == null && rightValue == null) return 0;
-  if (leftValue == null) return 1;
-  if (rightValue == null) return -1;
-  if (typeof leftValue === "number" && typeof rightValue === "number") {
-    return (leftValue - rightValue) * direction;
-  }
-  return (
-    String(leftValue).localeCompare(String(rightValue), undefined, { numeric: true }) * direction
   );
 }
 
@@ -366,10 +386,6 @@ export function qualityPerDollar(scorePoints, averageCost) {
     ? scorePoints / averageCost
     : null;
 }
-function benchmarkKey(identity) {
-  return JSON.stringify([identity.benchmarkId, identity.benchmarkVersion]);
-}
-
 function taskResult() {
   return {
     observations: 0,
@@ -469,8 +485,10 @@ export function aggregateToolUsage(index, profiles, trials, rounds, toolCalls, f
     if (!trialMatchesFilters(identity, taskFamily(trial.taskId), filters)) continue;
     const model = modelRouteIdentity(identity);
     const key = JSON.stringify([model, identity.harnessFamily, identity.harnessVersion]);
-    const group = groups.get(key) ?? {
+    const runKey = JSON.stringify([trial.runId, model, identity.harnessFamily, identity.harnessVersion]);
+    const group = groups.get(runKey) ?? {
       key,
+      runId: trial.runId,
       model,
       harness: identity.harnessFamily,
       harnessVersion: identity.harnessVersion,
@@ -479,8 +497,8 @@ export function aggregateToolUsage(index, profiles, trials, rounds, toolCalls, f
       toolCounts: new Map(),
     };
     group.trials += 1;
-    groups.set(key, group);
-    selectedTrials.set(`${trial.runId}::${trial.trialId}`, key);
+    groups.set(runKey, group);
+    selectedTrials.set(`${trial.runId}::${trial.trialId}`, runKey);
   }
 
   const groupByRound = new Map();
@@ -500,6 +518,7 @@ export function aggregateToolUsage(index, profiles, trials, rounds, toolCalls, f
     .map((group) => ({
       key: group.key,
       model: group.model,
+      runId: group.runId,
       harness: group.harness,
       harnessVersion: group.harnessVersion,
       trials: group.trials,
@@ -540,7 +559,13 @@ export function toolTrialCounts(index, profiles, trials, rounds, toolCalls, tool
       identity.harnessFamily,
       identity.harnessVersion,
     ]);
-    const entry = { key, trialId: trial.trialId, taskId: trial.taskId, calls: 0 };
+    const entry = {
+      key,
+      runId: trial.runId,
+      trialId: trial.trialId,
+      taskId: trial.taskId,
+      calls: 0,
+    };
     selected.set(`${trial.runId}::${trial.trialId}`, entry);
     result.push(entry);
   }
@@ -559,49 +584,158 @@ export function toolTrialCounts(index, profiles, trials, rounds, toolCalls, tool
 }
 
 /**
- * Join normalized profiles, trials and rounds and aggregate selected trials by
- * exact published configuration. Missing efficiency values stay missing.
+ * Aggregate accepted observations by run and exact configuration. Unlike the
+ * published leaderboard view, repeated accepted runs stay separate so a
+ * compact matrix cell can honestly use the last accepted run.
  */
-
-
-function rollupIdentity(row) {
-  return {
-    modelFamily: row.modelFamily,
-    modelVersion: row.modelVersion,
-    agentFamily: row.agentFamily,
-    agentVersion: row.agentVersion,
-    harnessFamily: row.harnessFamily,
-    harnessVersion: row.harnessVersion,
-    provider: row.provider,
-    configurationLabels: row.configurationLabels,
-    transport: row.transport,
-    harnessKind: row.harnessKind,
-    adapterVersion: row.adapterVersion,
-  };
-}
-
-function hierarchicalMean(families, selector) {
-  return mean(
-    [...families.values()].map((versions) =>
-      mean(
-        [...versions.values()].map((reasoningRows) =>
-          mean(reasoningRows.map(selector).filter((value) => value != null)),
-        ),
-      ),
-    ),
+export function aggregateRunConfigurations(index, profiles, trials, rounds, filters = {}) {
+  const runs = new Map(index.runs.map((run) => [run.runId, run]));
+  const profileMap = new Map(
+    profiles.map((profile) => [`${profile.runId}::${profile.profileId}`, profile]),
   );
-}
-function averageMetric(rows, name) {
-  return rows.reduce(
-    (metric, row) => ({
-      total: metric.total + row[name].total,
-      observations: metric.observations + row[name].observations,
-    }),
-    metricState(),
-  );
+  const benchmarkTasks = new Map();
+  const roundStats = new Map();
+
+  for (const trial of trials) {
+    const run = runs.get(trial.runId);
+    if (!run) continue;
+    const family = taskFamily(trial.taskId);
+    if (!matchesFilter(family, filters.taskFamily)) continue;
+    const definedTasks = run.definitions?.taskSet?.taskIds;
+    const tasks =
+      benchmarkTasks.get(trial.runId) ??
+      new Set(
+        Array.isArray(definedTasks)
+          ? definedTasks.filter((taskId) => matchesFilter(taskFamily(taskId), filters.taskFamily))
+          : [],
+      );
+    tasks.add(trial.taskId);
+    benchmarkTasks.set(trial.runId, tasks);
+  }
+
+  for (const round of rounds) {
+    const key = `${round.runId}::${round.trialId}`;
+    const stats = roundStats.get(key) ?? {
+      rounds: 0,
+      duration: metricState(),
+      cost: metricState(),
+      tokens: metricState(),
+    };
+    stats.rounds += 1;
+    for (const [name, field] of [
+      ["duration", "seconds"],
+      ["cost", "costUsd"],
+      ["tokens", "totalTokens"],
+    ]) {
+      const value = round[field];
+      if (typeof value === "number" && Number.isFinite(value)) {
+        stats[name].total += value;
+        stats[name].observations += 1;
+      }
+    }
+    roundStats.set(key, stats);
+  }
+
+  const groups = new Map();
+  for (const trial of trials) {
+    const run = runs.get(trial.runId);
+    const profile = profileMap.get(`${trial.runId}::${trial.profileId}`);
+    if (!run || !profile) continue;
+    const family = taskFamily(trial.taskId);
+    const identity = exactIdentity(profile, run);
+    if (!trialMatchesFilters(identity, family, filters)) continue;
+    const key = JSON.stringify([trial.runId, identity]);
+    const group = groups.get(key) ?? {
+      ...identity,
+      runId: trial.runId,
+      observations: 0,
+      tasks: new Map(),
+      taskFamilies: new Set(),
+      trialSamples: [],
+      recoveryRounds: 0,
+      duration: metricState(),
+      cost: metricState(),
+      tokens: metricState(),
+    };
+    group.observations += 1;
+    const task = group.tasks.get(trial.taskId) ?? taskResult();
+    task.observations += 1;
+    task.firstExactPasses += Number(trial.firstExactPassed === true);
+    task.finalExactPasses += Number(trial.finalExactPassed === true);
+    group.tasks.set(trial.taskId, task);
+    group.taskFamilies.add(family);
+    group.recoveryRounds += Math.max(0, trial.rounds - 1);
+    const sample = {
+      taskId: trial.taskId,
+      firstExactPassed: trial.firstExactPassed === true,
+      finalExactPassed: trial.finalExactPassed === true,
+      seconds: null,
+      costUsd: null,
+      tokens: null,
+    };
+    const stats = roundStats.get(`${trial.runId}::${trial.trialId}`);
+    if (stats && stats.rounds === trial.rounds) {
+      for (const name of metricNames) {
+        if (stats[name].observations === stats.rounds) {
+          group[name].total += stats[name].total;
+          group[name].observations += 1;
+          sample[SAMPLE_FIELDS[name]] = stats[name].total;
+          if (name === "duration") {
+            task.duration.total += stats[name].total;
+            task.duration.observations += 1;
+          }
+        }
+      }
+    }
+    group.trialSamples.push(sample);
+    groups.set(key, group);
+  }
+
+  return [...groups.values()].map((group) => {
+    const taskResults = [...group.tasks.values()];
+    const firstExactRate = mean(
+      taskResults.map((task) => task.firstExactPasses / task.observations),
+    );
+    const finalExactRate = mean(
+      taskResults.map((task) => task.finalExactPasses / task.observations),
+    );
+    const qualityScore =
+      firstExactRate == null || finalExactRate == null
+        ? null
+        : 0.75 * firstExactRate + 0.25 * finalExactRate;
+    const taskCount = group.tasks.size;
+    const benchmarkTaskCount = benchmarkTasks.get(group.runId)?.size ?? taskCount;
+    const coverage = benchmarkTaskCount ? taskCount / benchmarkTaskCount : null;
+    return {
+      ...group,
+      tasks: undefined,
+      firstExactRate,
+      finalExactRate,
+      recoveryGain:
+        firstExactRate == null || finalExactRate == null ? null : finalExactRate - firstExactRate,
+      qualityScore,
+      coverage,
+      score: qualityScore == null || coverage == null ? null : qualityScore * coverage,
+      taskCount,
+      benchmarkTaskCount,
+      complete: taskCount === benchmarkTaskCount,
+      durationSummary: {
+        averageCase: metricAverage(group, "duration"),
+        totalObserved: group.duration.observations ? group.duration.total : null,
+        coveredTasks: taskResults.filter((task) => task.duration.observations > 0).length,
+      },
+      taskFamilies: [...group.taskFamilies].sort(),
+      runIds: [group.runId],
+      configurationHashes: [group.configurationHash],
+      submissionIds: runIdToSubmission(index, group.runId),
+    };
+  });
 }
 
-/** Return one precomputed task-family row for an accepted configuration. */
+function runIdToSubmission(index, runId) {
+  const submissionId = index.runs.find((run) => run.runId === runId)?.submissionId;
+  return submissionId ? [submissionId] : [];
+}
 export function precomputedFamilyScore(row, family) {
   const candidates = precomputedViews?.taskFamilies?.[family] ?? [];
   return (
