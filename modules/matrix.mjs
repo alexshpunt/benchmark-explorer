@@ -47,6 +47,32 @@ function rampBounds(scores) {
   return low < high ? { low, high } : { low: sorted[0], high: sorted[sorted.length - 1] };
 }
 
+/** Median for a column across model families, with providers sharing one model vote. */
+export function matrixAcrossModels(cells, column, rowsOf = (cell) => cell.sourceRows ?? []) {
+  const matches = cells.filter((cell) => cell.columnKey === column.columnKey);
+  if (!matches.length) return null;
+  const families = new Map();
+  for (const cell of matches) {
+    const family = cell.model.split("\t")[0];
+    families.set(family, [...(families.get(family) ?? []), cell]);
+  }
+  const representatives = [...families.values()].map((members) => {
+    const parent = members.find((cell) => !cell.model.includes("\t"));
+    return parent ? [parent] : members;
+  });
+  const fields = ["score", "firstExactRate", "finalExactRate", "recoveryGain", "duration",
+    "averageCost", "averageTokens", "qualityPerDollar"];
+  const values = Object.fromEntries(fields.map((field) =>
+    [field, median(representatives.map((group) => median(group.map((cell) => cell[field]))))]));
+  return {
+    ...column, ...values, key: `across-models:${column.columnKey}`, model: "Overall",
+    label: `Across ${families.size} models · ${column.label}`, compact: true,
+    sourceRows: [...new Set(matches.flatMap(rowsOf))],
+    observations: representatives.reduce((sum, group) => sum + group[0].observations, 0),
+    costObservations: representatives.reduce((sum, group) => sum + (group[0].costObservations ?? 0), 0),
+    tokenObservations: representatives.reduce((sum, group) => sum + (group[0].tokenObservations ?? 0), 0),
+  };
+}
 /** Create the matrix with shared state and actions supplied by the entry point. */
 export function createMatrix(state, {
   mean, OVERALL, COLORS, selectedValues, syncUrl, render, renderMatrixState,
@@ -426,7 +452,7 @@ export function createMatrix(state, {
     const { low, high } = metricValues.length ? rampBounds(metricValues) : { low: 0, high: 0 };
     const table = document.createElement("table");
     table.className = "matrix-table";
-    table.style.minWidth = `${10 + series.length * 8}rem`;
+    table.style.width = `${180 + series.length * 78}px`;
     const head = document.createElement("thead");
     const headRow = document.createElement("tr");
     const modelHead = document.createElement("th");
@@ -439,7 +465,10 @@ export function createMatrix(state, {
         // One column for every harness of a model, so it is not a harness itself
         // and has no single harness card to open.
         th.className = "matrix-overall-head";
-        th.textContent = seriesCell.label;
+        const label = document.createElement("span");
+        label.className = "matrix-header-label";
+        label.textContent = seriesCell.label;
+        th.append(label);
         th.title = "Every visible harness of this model, pooled per task";
         headRow.append(th);
         continue;
@@ -503,7 +532,53 @@ export function createMatrix(state, {
       headRow.append(th);
     }
     head.append(headRow);
+    function renderValue(cell, modelLabel) {
+      const td = document.createElement("td");
+      if (!cell) {
+        td.className = "matrix-missing";
+        td.textContent = "—";
+        return td;
+      }
+      const button = document.createElement("button");
+      button.className = "matrix-cell";
+      const position = selectionOrder.get(cell.key);
+      const chosen = position != null;
+      td.classList.toggle("selected", chosen);
+      if (chosen) td.style.setProperty("--selection-color", COLORS[position % COLORS.length]);
+      const value = metric.value(cell);
+      const source = cell.runId ? `${cell.label}\nRun: ${cell.runId}` : cell.label;
+      const note = !cell.overall && !cell.compact && rowsForCell(cell).every((row) => !row.fullBenchmark)
+        ? "\nPartial benchmark run; excluded from summary scores" : "";
+      if (value == null) {
+        button.textContent = "—";
+        button.classList.add("matrix-value-missing");
+        button.title = `${modelLabel}\n${source}${note}\n${metric.label}: not reported\n${chosen ? "Selected — click to remove" : "Click to compare"}`;
+      } else {
+        button.style.setProperty("--score-color",
+          scoreColor(relativeQualityPosition(value, low, high, metric.higherIsBetter)));
+        button.textContent = metric.format(value);
+        button.title = `${modelLabel}\n${source}${note}\n${metric.label}: ${metric.format(value)}\n${metric.detail(cell)}\n${chosen ? "Selected — click to remove" : "Click to compare"}`;
+      }
+      button.setAttribute("aria-label", button.title.replaceAll("\n", ". "));
+      button.addEventListener("click", () => toggleSelection(cell.key));
+      td.append(button);
+      return td;
+    }
     const body = document.createElement("tbody");
+    const summaryRow = document.createElement("tr");
+    summaryRow.className = "matrix-across-models";
+    const summaryLabel = document.createElement("th");
+    summaryLabel.scope = "row";
+    summaryLabel.className = "matrix-model-column";
+    summaryLabel.textContent = "Overall";
+    summaryLabel.title = "Median across all visible model families";
+    summaryRow.append(summaryLabel);
+    for (const column of series) {
+      const summary = matrixAcrossModels(cells, column, rowsForCell);
+      if (summary) state.matrixCellCache.set(summary.key, summary);
+      summaryRow.append(renderValue(summary, "Across all models"));
+    }
+    body.append(summaryRow);
     for (const model of models) {
       const row = document.createElement("tr");
       const heading = document.createElement("th");
@@ -547,46 +622,8 @@ export function createMatrix(state, {
       if (provider) rowActions.append(matrixFilterButton("provider", provider, provider));
       heading.append(rowActions);
       row.append(heading);
-      for (const seriesCell of series) {
-        const td = document.createElement("td");
-        const cell = byPosition.get(`${model}\0${seriesCell.columnKey}`);
-        if (cell) {
-          const button = document.createElement("button");
-          button.className = "matrix-cell";
-          // The cell carries the frame colour, so the number and the bar stay clean.
-          const position = selectionOrder.get(cell.key);
-          const chosen = position != null;
-          td.classList.toggle("selected", chosen);
-          if (chosen) {
-            td.style.setProperty("--selection-color", COLORS[position % COLORS.length]);
-          }
-          const value = metric.value(cell);
-          const source = cell.runId
-            ? `${cell.label}\nRun: ${cell.runId}`
-            : cell.label;
-          const note = !cell.overall && !cell.compact && rowsForCell(cell).every((row) => !row.fullBenchmark)
-            ? "\nPartial benchmark run; excluded from summary scores" : "";
-          if (value == null) {
-            button.textContent = "—";
-            button.classList.add("matrix-value-missing");
-            button.title = `${modelLabel}\n${source}${note}\n${metric.label}: not reported\n${chosen ? "Selected — click to remove" : "Click to compare"}`;
-          } else {
-            button.style.setProperty(
-              "--score-color",
-              scoreColor(relativeQualityPosition(value, low, high, metric.higherIsBetter)),
-            );
-            button.textContent = metric.format(value);
-            button.title = `${modelLabel}\n${source}${note}\n${metric.label}: ${metric.format(value)}\n${metric.detail(cell)}\n${chosen ? "Selected — click to remove" : "Click to compare"}`;
-          }
-          button.setAttribute("aria-label", button.title.replaceAll("\n", ". "));
-          button.addEventListener("click", () => toggleSelection(cell.key));
-          td.append(button);
-        } else {
-          td.className = "matrix-missing";
-          td.textContent = "—";
-        }
-        row.append(td);
-      }
+      for (const seriesCell of series)
+        row.append(renderValue(byPosition.get(`${model}\0${seriesCell.columnKey}`), modelLabel));
       body.append(row);
     }
     table.append(head, body);

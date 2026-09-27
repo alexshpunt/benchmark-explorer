@@ -38,9 +38,6 @@ footer p {
     margin-left: 0;
     overflow-x: auto;
   }
-  .matrix-table {
-    min-width: 520px;
-  }
   .selection-body {
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas:
