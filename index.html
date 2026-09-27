@@ -194,10 +194,12 @@
             <p>
               Rows are model routes and columns are harnesses. A compact harness column uses each
               model's latest available version and accepted run; hover a value to see that source.
-              Use the arrow beside a harness to compare its versions side by side. The Overall column
-              pools harnesses for each model; Across all models gives the median by model family for
-              each harness, with providers sharing one model vote. The two summaries have no shared
-              score. Only full benchmark runs contribute to scores and other summary metrics.
+              Use the arrow beside a harness to compare its versions side by side.
+              Across all harnesses pools full runs for each model. In Score, Across all models
+              shows the median score difference from pi-default on the same model families,
+              with one vote per model and at least three matched families required. A plus sign
+              means the harness scored higher than pi-default. Other metrics show medians across
+              models. The top-left corner has no score. Only full benchmark runs contribute to summaries.
               In Score, an incomplete cell shows a dash and the largest single run's task count
               (N/total tasks) instead of a misleading score. Select a value to compare
               configurations, or select a row or column label to open details.

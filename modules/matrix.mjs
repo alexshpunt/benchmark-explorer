@@ -73,6 +73,28 @@ export function matrixAcrossModels(cells, column, rowsOf = (cell) => cell.source
     tokenObservations: representatives.reduce((sum, group) => sum + (group[0].tokenObservations ?? 0), 0),
   };
 }
+/** Median paired score difference from pi-default, with one vote per shared model family. */
+export function matrixMatchedHarnessDelta(cells, column, minimum = 3) {
+  const byFamily = (matches) => {
+    const groups = new Map();
+    for (const cell of matches.filter((item) => Number.isFinite(item.score))) {
+      const family = cell.model.split("\t")[0];
+      groups.set(family, [...(groups.get(family) ?? []), cell]);
+    }
+    return new Map([...groups].map(([family, members]) => {
+      const parent = members.find((cell) => cell.model === family);
+      return [family, { score: parent ? parent.score : median(members.map((cell) => cell.score)),
+        members: parent ? [parent] : members }];
+    }));
+  };
+  const baseline = byFamily(cells.filter((cell) => cell.columnKey === "pi-default"));
+  const target = byFamily(cells.filter((cell) => cell.columnKey === column.columnKey));
+  const modelFamilies = [...target.keys()].filter((family) => baseline.has(family));
+  const differences = modelFamilies.map((family) => target.get(family).score - baseline.get(family).score);
+  return { delta: modelFamilies.length >= minimum ? median(differences) : null,
+    pairs: modelFamilies.length, modelFamilies,
+    matchedCells: modelFamilies.flatMap((family) => target.get(family).members) };
+}
 /** Best single incomplete run in a cell, measured against the published task set. */
 export function matrixPartialCoverage(rows, total) {
   if (!total || rows.some((row) => row.fullBenchmark)) return null;
@@ -142,7 +164,7 @@ export function createMatrix(state, {
         harness: OVERALL,
         version: null,
         overall: true,
-        label: "Overall",
+        label: "Across all harnesses",
         score: group.score,
         firstExactRate: group.firstExactRate,
         finalExactRate: group.finalExactRate,
@@ -364,7 +386,7 @@ export function createMatrix(state, {
       const fields = ["score", "firstExactRate", "finalExactRate", "recoveryGain", "duration", "averageCost", "averageTokens", "qualityPerDollar"];
       const values = Object.fromEntries(fields.map((field) => [field, providerMedian(members, field)]));
       return { ...first, ...values, key: "group:" + JSON.stringify([model, columnKey]), model,
-        columnKey, harness, label: harness === OVERALL ? "Overall" : harness,
+        columnKey, harness, label: harness === OVERALL ? "Across all harnesses" : harness,
         compact: first.compact, grouped: true, sourceRows: [...new Set(members.flatMap(rowsForCell))],
         observations: members.reduce((sum, cell) => sum + cell.observations, 0),
         costObservations: members.reduce((sum, cell) => sum + cell.costObservations, 0),
@@ -412,32 +434,20 @@ export function createMatrix(state, {
         (overallScore.get(leftFamily) ?? overallScore.get(left) ?? 0) || left.localeCompare(right);
     });
     const overall = cells.find((cell) => cell.overall);
-    const harnessScores = new Map();
-    for (const row of state.configurations) {
-      harnessScores.set(row.harnessFamily, [
-        ...(harnessScores.get(row.harnessFamily) ?? []),
-        row,
-      ]);
-    }
-    // Ranking keeps measured quality dominant while preferring harness families
-    // that have evidence for more of the currently visible models.
-    const rankByHarness = new Map(
-      [...harnessScores].map(([harness, rows]) => {
-        const score = aggregateGroupScore(rows).score;
-        const testedModels = new Set(rows.map(modelRouteIdentity)).size;
-        const completeness = models.length ? testedModels / models.length : 0;
-        return [harness, score * (0.75 + 0.25 * completeness)];
-      }),
-    );
     const byHarness = new Map();
     for (const cell of cells.filter((candidate) => !candidate.overall)) {
       byHarness.set(cell.harness, [...(byHarness.get(cell.harness) ?? []), cell]);
     }
+    const rankByHarness = new Map([...byHarness].map(([harness, entries]) => {
+      const column = entries.find((cell) => cell.compact) ?? entries[0];
+      const match = matrixMatchedHarnessDelta(cells, column);
+      return [harness, match.delta];
+    }));
     const harnessOrder = [...byHarness.keys()].sort((left, right) => {
       const a = matrixHarnessGroup(left);
       const b = matrixHarnessGroup(right);
       if (a === b) return left === a ? -1 : right === b ? 1 : left.localeCompare(right);
-      return (rankByHarness.get(b) ?? 0) - (rankByHarness.get(a) ?? 0) || a.localeCompare(b);
+      return (rankByHarness.get(b) ?? -1) - (rankByHarness.get(a) ?? -1) || a.localeCompare(b);
     });
     const harnesses = harnessOrder.flatMap((harness) => {
       const unique = [
@@ -558,28 +568,49 @@ export function createMatrix(state, {
       const chosen = position != null;
       td.classList.toggle("selected", chosen);
       if (chosen) td.style.setProperty("--selection-color", COLORS[position % COLORS.length]);
-      const value = metric.value(cell);
+      const value = cell.paired
+        ? (cell.paired.delta == null ? null : cell.paired.delta * 100)
+        : metric.value(cell);
       const source = cell.runId ? `${cell.label}\nRun: ${cell.runId}` : cell.label;
       const note = !cell.overall && !cell.compact && rowsForCell(cell).every((row) => !row.fullBenchmark)
         ? "\nPartial benchmark run; excluded from summary scores" : "";
       if (value == null) {
         button.textContent = "—";
         button.classList.add("matrix-value-missing");
-        const coverage = state.matrixMetric === "score" ? coverageFor(cell) : null;
+        const coverage = !cell.paired && state.matrixMetric === "score" ? coverageFor(cell) : null;
         if (coverage) {
           button.classList.add("matrix-partial-coverage");
           const count = document.createElement("small");
           count.textContent = `${coverage.count}/${coverage.total}`;
           button.append(count);
         }
-        button.title = `${modelLabel}\n${source}${note}\n${metric.label}: not reported` +
+        if (cell.paired) {
+          button.classList.add("matrix-paired");
+          const count = document.createElement("small");
+          count.textContent = `${cell.paired.pairs}/3 pairs`;
+          button.append(count);
+        }
+        button.title = `${modelLabel}\n${source}${note}\n${cell.paired
+          ? `${cell.paired.pairs} shared model families; at least 3 needed for a paired score versus pi-default`
+          : `${metric.label}: not reported`}` +
           (coverage ? `\nMost complete single run: ${coverage.count}/${coverage.total} tasks` : "") +
           `\n${chosen ? "Selected — click to remove" : "Click to compare"}`;
       } else {
-        button.style.setProperty("--score-color",
-          scoreColor(relativeQualityPosition(value, low, high, metric.higherIsBetter)));
-        button.textContent = metric.format(value);
-        button.title = `${modelLabel}\n${source}${note}\n${metric.label}: ${metric.format(value)}\n${metric.detail(cell)}\n${chosen ? "Selected — click to remove" : "Click to compare"}`;
+        button.style.setProperty("--score-color", cell.paired
+          ? (value > 0 ? "var(--green)" : value < 0 ? "var(--red)" : "var(--border-strong)")
+          : scoreColor(relativeQualityPosition(value, low, high, metric.higherIsBetter)));
+        if (cell.paired) {
+          const delta = `${value > 0 ? "+" : ""}${value.toFixed(1)} pp`;
+          button.textContent = delta;
+          button.classList.add("matrix-paired");
+          const count = document.createElement("small");
+          count.textContent = `${cell.paired.pairs} pairs`;
+          button.append(count);
+          button.title = `${modelLabel}\n${source}\n${delta} median score difference versus pi-default across ${cell.paired.pairs} shared model families\n${chosen ? "Selected — click to remove" : "Click to compare"}`;
+        } else {
+          button.textContent = metric.format(value);
+          button.title = `${modelLabel}\n${source}${note}\n${metric.label}: ${metric.format(value)}\n${metric.detail(cell)}\n${chosen ? "Selected — click to remove" : "Click to compare"}`;
+        }
       }
       button.setAttribute("aria-label", button.title.replaceAll("\n", ". "));
       button.addEventListener("click", () => toggleSelection(cell.key));
@@ -593,7 +624,9 @@ export function createMatrix(state, {
     summaryLabel.scope = "row";
     summaryLabel.className = "matrix-model-column";
     summaryLabel.textContent = "Across all models";
-    summaryLabel.title = "Median across model families, with one vote per model";
+    summaryLabel.title = state.matrixMetric === "score"
+      ? "Median paired score difference from pi-default across at least 3 shared model families"
+      : "Median across model families, with one vote per model";
     summaryRow.append(summaryLabel);
     for (const column of series) {
       if (column.overall) {
@@ -604,6 +637,14 @@ export function createMatrix(state, {
         continue;
       }
       const summary = matrixAcrossModels(cells, column, rowsForCell);
+      if (summary && state.matrixMetric === "score") {
+        const paired = matrixMatchedHarnessDelta(cells, column);
+        summary.paired = { delta: paired.delta, pairs: paired.pairs };
+        summary.label = `${paired.pairs} matched model families · ${column.label}`;
+        summary.sourceRows = [...new Set(paired.matchedCells.flatMap(rowsForCell))];
+        summary.observations = summary.sourceRows.filter((row) => row.fullBenchmark)
+          .reduce((count, row) => count + row.observations, 0);
+      }
       if (summary) state.matrixCellCache.set(summary.key, summary);
       summaryRow.append(renderValue(summary, "Across all models"));
     }
