@@ -6,6 +6,10 @@ The Space reads accepted, generated views from the public [Explicit Edit Benchma
 
 Run `npm run build:snapshot` before serving locally. The build resolves the current Dataset commit, pins every file to that revision, checks published SHA-256 digests, and writes `dist/snapshot.json.gz` and `dist/snapshot-manifest.json`. Serve the app files together with these two files at the web root. The deploy workflow builds and publishes them with the Space.
 
+The Explorer is a public leaderboard for comparing how models and harnesses behave on precise text-editing tasks. Its header shows the number of published runs and the latest additions in the pinned Dataset index. Each addition opens that run's evidence inside the Explorer.
+
+We aim to make every visible result clickable. A number, model, harness, run, or summary should lead to its underlying detail, a useful filtered view, or its published source. Do not make something look interactive unless it goes somewhere useful.
+
 The browser entry point is `app.mjs`. Interactive views live in `modules/`: `matrix.mjs` renders grouped scores, `leaderboard.mjs` renders the results table, `comparison.mjs` renders selected-run comparisons, `details.mjs` renders cards and dialogs, and `filters.mjs` owns filter menus and table controls. Their matching styles are in `styles/`; `index.html` loads them in cascade order. The deploy workflow publishes both directories with the entry point and snapshot.
 
 The browser loads only this checked snapshot. It does not fetch individual run shards. The snapshot contains accepted Dataset views, pre-aggregated run configurations and the compact trial evidence needed for interactive filters, comparisons and tool details. Scores and exclusions still come from the accepted Dataset views; the Space does not edit accepted data.

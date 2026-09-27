@@ -574,6 +574,18 @@ export function createDetails(state, {
     setCard(`config:${scopeToken(rows)}`);
   }
 
+  /** A published run, including configurations hidden by the current filters. */
+  function openRunDetails(runId) {
+    const run = state.index?.runs?.find((entry) => entry.runId === runId);
+    const rows = state.snapshot?.runRows?.all?.filter((row) => row.runId === runId) ?? [];
+    if (!run || !rows.length) return;
+    openDetailsDialog(`Run: ${runId}`, `${rows.length} configurations · ${run.counts.trials.toLocaleString()} trials`, [
+      configurationListSection(rows, "Configurations in this run"),
+      taskOutcomeSection(rows),
+      provenanceSection(rows),
+    ]);
+    setCard(`run:${runId}`);
+  }
   /** One model route: every visible configuration it ran, plus its task outcomes. */
   function openModelDetails(route) {
     const rows = rowsForModel(route);
@@ -1052,5 +1064,5 @@ export function createDetails(state, {
     return state.configurations.filter((row) => column.detail.identity(row) === identity);
   }
 
-  return { openConfigurationDetails, openModelDetails, openAgentDetails, openThinkingDetails, openHarnessDetails, openTaskFamilyDetails, openTaskDetails, openToolDetails, openCellDetails, familyScore, formatNumber, closeOnOutsideClick };
+  return { openConfigurationDetails, openRunDetails, openModelDetails, openAgentDetails, openThinkingDetails, openHarnessDetails, openTaskFamilyDetails, openTaskDetails, openToolDetails, openCellDetails, familyScore, formatNumber, closeOnOutsideClick };
 }

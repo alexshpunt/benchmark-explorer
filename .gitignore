@@ -1,4 +1,6 @@
 dist/
+/snapshot.json.gz
+/snapshot-manifest.json
 .space/
 .tmp/
 .playwright-mcp/

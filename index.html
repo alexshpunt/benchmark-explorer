@@ -13,6 +13,7 @@
       if (theme === "light" || theme === "dark") document.documentElement.dataset.theme = theme;
     </script>
     <link rel="stylesheet" href="./styles/base.css" />
+    <link rel="stylesheet" href="./styles/header.css" />
     <link rel="stylesheet" href="./styles/matrix.css" />
     <link rel="stylesheet" href="./styles/comparison.css" />
     <link rel="stylesheet" href="./styles/leaderboard-controls.css" />
@@ -41,6 +42,28 @@
       <p id="loader-detail" class="loader-detail">Reading the dataset index</p>
     </div>
     <main>
+      <header class="editorial-header" aria-labelledby="explorer-title">
+        <div class="editorial-intro">
+          <p class="editorial-kicker">Explicit Edit / Public benchmark</p>
+          <h1 id="explorer-title">What changes when the <em>harness</em> changes?</h1>
+          <p class="editorial-description">A public leaderboard comparing how models and harnesses behave on precise text-editing tasks. Explore accepted runs, inspect the evidence, and see where the same model performs differently.</p>
+          <a class="editorial-cta" href="#matrix-title">Explore the results <span aria-hidden="true">↗</span></a>
+        </div>
+        <div class="editorial-data">
+          <a class="editorial-count" href="#results-view" aria-label="Browse all published runs">
+            <span class="editorial-overline">Published runs</span>
+            <strong id="header-run-count">—</strong>
+            <span class="editorial-count-link">Browse results <span aria-hidden="true">↗</span></span>
+          </a>
+          <section class="editorial-recent" aria-labelledby="recent-runs-title">
+            <div class="editorial-recent-heading">
+              <h2 id="recent-runs-title">Latest additions</h2>
+              <span>From the published dataset</span>
+            </div>
+            <ol id="recent-runs" class="editorial-recent-list"><li>Loading runs…</li></ol>
+          </section>
+        </div>
+      </header>
       <section class="status-bar" aria-label="Dataset status">
         <span class="status-badge">
           <span class="status-dot" aria-hidden="true"></span>
@@ -77,11 +100,8 @@
         </p>
       </section>
 
-      <section class="explorer-toolbar" aria-labelledby="explorer-title">
-        <div class="toolbar-heading">
-          <h1 id="explorer-title">Explicit Edit accepted results</h1>
-          <p>Accepted observations across models, agents, and harnesses.</p>
-        </div>
+      <section class="explorer-toolbar" aria-label="Explorer controls">
+        <h2 class="toolbar-title">Explore accepted results</h2>
         <div class="view-actions">
           <a
             class="icon-button resource-link"

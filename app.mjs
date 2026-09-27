@@ -216,7 +216,7 @@ const OVERALL = "all";
 function scopeOf(token) {
   if (!token || token === "all") return state.configurations;
   const [model, provider, harness, version = "", thinking = "", runId = ""] = token.split("|");
-  const rows = runId ? state.compactConfigurations : state.configurations;
+  const rows = runId ? (state.snapshot?.runRows?.all ?? []) : state.configurations;
   return rows.filter(
     (row) =>
       canonicalModelFamily(row.modelFamily) === model &&
@@ -261,6 +261,10 @@ function openCard(value) {
   }
   const kind = value.slice(0, separator);
   const payload = value.slice(separator + 1);
+  if (kind === "run") {
+    openRunDetails(payload);
+    return;
+  }
   if (kind === "config") {
     openConfigurationDetails(scopeOf(payload));
     return;
@@ -327,7 +331,7 @@ const { COLUMN_BY_ID, DEFAULT_COLUMN_IDS, REQUIRED_COLUMN_IDS, saveColumnLayout,
   getLeaderboardTableObserver: () => getLeaderboardTableObserver(),
 });
 
-const { openConfigurationDetails, openModelDetails, openAgentDetails, openThinkingDetails,
+const { openConfigurationDetails, openRunDetails, openModelDetails, openAgentDetails, openThinkingDetails,
   openHarnessDetails, openTaskFamilyDetails, openTaskDetails, openToolDetails,
   openCellDetails, familyScore, formatNumber, closeOnOutsideClick } = createDetails(state, {
   DATASET_PAGE, percentText, mean, scopeToken, configToken, setCard,
@@ -398,6 +402,42 @@ function render() {
   );
 }
 
+function renderRecentRuns() {
+  document.querySelector("#header-run-count").textContent = state.index.runs.length.toLocaleString();
+  const list = document.querySelector("#recent-runs");
+  const profiles = new Map();
+  for (const profile of state.profiles) {
+    if (!profiles.has(profile.runId)) profiles.set(profile.runId, profile);
+  }
+  list.replaceChildren(...state.index.runs.slice(-3).reverse().map((run) => {
+    const profile = profiles.get(run.runId);
+    const item = document.createElement("li");
+    const link = document.createElement("a");
+    const url = new URL(currentSearch() || location.pathname, location.href);
+    url.searchParams.set("card", `run:${run.runId}`);
+    link.href = url.href;
+    link.title = `Open run ${run.runId}`;
+    const label = document.createElement("span");
+    const name = document.createElement("strong");
+    name.textContent = profile
+      ? `${profile.modelFamily ?? profile.modelId ?? "Model"} · ${profile.harnessFamily ?? profile.harnessId ?? "Harness"}`
+      : run.runId;
+    const id = document.createElement("small");
+    id.textContent = run.runId;
+    label.append(name, id);
+    const arrow = document.createElement("span");
+    arrow.setAttribute("aria-hidden", "true");
+    arrow.textContent = "↗";
+    link.append(label, arrow);
+    link.addEventListener("click", (event) => {
+      if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      event.preventDefault();
+      openRunDetails(run.runId);
+    });
+    item.append(link);
+    return item;
+  }));
+}
 async function load() {
   if (typeof DecompressionStream === "undefined")
     throw new Error("This browser does not support gzip streams. Use a current browser.");
@@ -434,6 +474,7 @@ async function load() {
   document.querySelector("#exclusion-policy").textContent =
     snapshot.views.exclusions?.policyId ?? "none";
   document.querySelector("#observation-total").textContent = manifest.trials.toLocaleString();
+  renderRecentRuns();
   hideLoader();
   setStatus("ready", `Published scores · ${snapshot.index.runs.length} runs · ${manifest.trials.toLocaleString()} trial records`);
   render();
