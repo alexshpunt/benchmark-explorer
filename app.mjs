@@ -831,9 +831,11 @@ function renderMatrix(cells) {
     if (state.matrixGroups.has("model") && !provider) {
       const toggle = document.createElement("button");
       toggle.type = "button";
-      toggle.className = "matrix-expand-toggle";
+      toggle.className = "matrix-expand-toggle matrix-model-toggle";
       const expanded = state.expandedModels.has(modelFamily);
-      toggle.textContent = expanded ? "⌄" : "›";
+      const chevron = document.createElement("span");
+      chevron.textContent = "›";
+      toggle.append(chevron);
       toggle.setAttribute("aria-expanded", String(expanded));
       toggle.setAttribute("aria-label", (expanded ? "Collapse " : "Expand ") + modelFamily + " providers");
       toggle.addEventListener("click", () => {

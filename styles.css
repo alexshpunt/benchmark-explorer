@@ -735,6 +735,13 @@ main {
   cursor: pointer;
   font: 600 20px/1 var(--sans);
 }
+.matrix-model-toggle span {
+  display: inline-block;
+  line-height: 1;
+}
+.matrix-model-toggle[aria-expanded="true"] span {
+  transform: rotate(90deg);
+}
 .matrix-expand-toggle:hover,
 .matrix-expand-toggle:focus-visible {
   background: var(--surface-hover);
