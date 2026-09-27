@@ -5,7 +5,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { buildSnapshot } from "../scripts/build-snapshot.mjs";
+import { buildSnapshot, recentRunHighlights } from "../scripts/build-snapshot.mjs";
 import { filterSnapshotRunRows } from "../core.mjs";
 
 const revision = "a".repeat(40);
@@ -42,6 +42,27 @@ test("snapshot pins and verifies dataset files before publishing an artifact", a
   } finally { await rm(output, { recursive: true, force: true }); }
 });
 
+test("recent runs use their dataset acceptance date and median of full scores", () => {
+  const runs = ["older", "multi", "partial", "newest"].map((runId) => ({ runId }));
+  const rows = [
+    { runId: "multi", score: 0.8, fullBenchmark: true },
+    { runId: "multi", score: 1, fullBenchmark: true },
+    { runId: "multi", score: 0.1, fullBenchmark: false },
+    { runId: "partial", score: 0.2, fullBenchmark: false },
+    { runId: "newest", score: 0.95, fullBenchmark: true },
+  ];
+  const commits = [
+    { title: "Accept benchmark observation newest", date: "2026-09-27T12:00:00.000Z" },
+    { title: "Accept benchmark observation partial", date: "2026-09-26T12:00:00.000Z" },
+    { title: "Accept benchmark observation multi", date: "2026-09-25T12:00:00.000Z" },
+  ];
+  assert.deepEqual(recentRunHighlights(runs, rows, commits), [
+    { runId: "newest", acceptedAt: commits[0].date, score: 0.95 },
+    { runId: "partial", acceptedAt: commits[1].date, score: null },
+    { runId: "multi", acceptedAt: commits[2].date, score: 0.9 },
+  ]);
+  assert.throws(() => recentRunHighlights(runs, rows, commits.slice(0, 2)), /acceptance date/);
+});
 test("snapshot filters pre-aggregated configurations without dropping selected identities", () => {
   const row = { modelFamily: "model", provider: "provider", harnessFamily: "harness",
     harnessVersion: "1", taskFamilies: ["Language edits"], score: 0.8 };

@@ -409,14 +409,27 @@ function renderRecentRuns() {
   for (const profile of state.profiles) {
     if (!profiles.has(profile.runId)) profiles.set(profile.runId, profile);
   }
-  list.replaceChildren(...state.index.runs.slice(-3).reverse().map((run) => {
+  list.replaceChildren(...state.snapshot.recentRuns.map((run) => {
     const profile = profiles.get(run.runId);
     const item = document.createElement("li");
     const link = document.createElement("a");
     const url = new URL(currentSearch() || location.pathname, location.href);
     url.searchParams.set("card", `run:${run.runId}`);
     link.href = url.href;
-    link.title = `Open run ${run.runId}`;
+    const score = document.createElement("strong");
+    score.className = "recent-score";
+    score.textContent = run.score == null ? "—" : (run.score * 100).toFixed(1);
+    score.title = run.score == null ? "No full-run score" : "Median score of full configurations";
+    const firstDivider = document.createElement("span");
+    firstDivider.className = "recent-divider";
+    firstDivider.setAttribute("aria-hidden", "true");
+    const date = document.createElement("time");
+    date.dateTime = run.acceptedAt;
+    date.textContent = new Intl.DateTimeFormat("en", {
+      month: "short", day: "numeric", year: "numeric", timeZone: "UTC",
+    }).format(new Date(run.acceptedAt));
+    date.title = `Added to the dataset ${run.acceptedAt}`;
+    const secondDivider = firstDivider.cloneNode();
     const label = document.createElement("span");
     const name = document.createElement("strong");
     name.textContent = profile
@@ -424,11 +437,13 @@ function renderRecentRuns() {
       : run.runId;
     const id = document.createElement("small");
     id.textContent = run.runId;
+    link.title = `${name.textContent} · ${run.runId}`;
+    label.className = "recent-identity";
     label.append(name, id);
     const arrow = document.createElement("span");
     arrow.setAttribute("aria-hidden", "true");
     arrow.textContent = "↗";
-    link.append(label, arrow);
+    link.append(score, firstDivider, date, secondDivider, label, arrow);
     link.addEventListener("click", (event) => {
       if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
       event.preventDefault();
@@ -454,7 +469,8 @@ async function load() {
   const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("gzip"));
   const snapshot = JSON.parse(await new Response(stream).text());
   if (snapshot.schemaVersion !== 1 || snapshot.revision !== manifest.revision ||
-      !Array.isArray(snapshot.runRows?.all) || !Array.isArray(snapshot.trials) ||
+      !Array.isArray(snapshot.runRows?.all) || !Array.isArray(snapshot.recentRuns) ||
+      !Array.isArray(snapshot.trials) ||
       snapshot.trials.length !== manifest.trials)
     throw Error("Snapshot contents do not match the manifest");
   validateDatasetSnapshot(snapshot.index, snapshot.views);

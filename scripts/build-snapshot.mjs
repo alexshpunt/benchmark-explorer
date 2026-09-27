@@ -8,11 +8,29 @@ import {
   parseJsonLines,
   pinnedDatasetRoot,
   markFullBenchmarkRows,
+  median,
   taskFamily,
   validateDatasetSnapshot,
   verifyPublishedBytes,
 } from "../core.mjs";
 
+/** Give the three newest accepted runs their commit dates and full-run median scores. */
+export function recentRunHighlights(runs, rows, commits) {
+  const dates = new Map(commits
+    .filter((commit) => commit.title?.startsWith("Accept benchmark observation "))
+    .map((commit) => [commit.title.slice("Accept benchmark observation ".length), commit.date]));
+  return runs.slice(-3).reverse().map(({ runId }) => {
+    const acceptedAt = dates.get(runId);
+    if (!acceptedAt || !Number.isFinite(Date.parse(acceptedAt)))
+      throw Error(`Missing Dataset acceptance date for ${runId}`);
+    return {
+      runId,
+      acceptedAt,
+      score: median(rows.filter((row) => row.runId === runId && row.fullBenchmark)
+        .map((row) => row.score)),
+    };
+  });
+}
 /** Build one revision-pinned, checked Explorer artifact from accepted Dataset files. */
 export async function buildSnapshot({ dataset = "https://huggingface.co/datasets/alexshpunt/explicit-edit-benchmark",
   output = "dist", fetcher = fetch } = {}) {
@@ -55,7 +73,18 @@ export async function buildSnapshot({ dataset = "https://huggingface.co/datasets
   for (const family of families) runRows[family] = aggregateRunConfigurations(
     index, evidence.profiles, evidence.trials, evidence.rounds, { taskFamily: [family] });
   views.fullRunKeys = markFullBenchmarkRows(runRows, views);
-  const snapshot = { schemaVersion: 1, revision, index, views, runRows, ...evidence };
+  let recentRuns = [];
+  if (index.runs.length) {
+    const datasetUrl = new URL(dataset);
+    const repository = datasetUrl.pathname.replace(/^\/datasets\//, "").replace(/\/$/, "");
+    const commitsUrl = `${datasetUrl.origin}/api/datasets/${repository}/commits/${revision}?limit=1000`;
+    const commitsResponse = await fetcher(commitsUrl);
+    if (!commitsResponse.ok) throw Error(`Dataset commit history: HTTP ${commitsResponse.status}`);
+    const commits = await commitsResponse.json();
+    if (!Array.isArray(commits)) throw Error("Invalid Dataset commit history");
+    recentRuns = recentRunHighlights(index.runs, runRows.all, commits);
+  }
+  const snapshot = { schemaVersion: 1, revision, index, views, runRows, recentRuns, ...evidence };
   const bytes = gzipSync(JSON.stringify(snapshot), { level: 9 });
   const sha256 = createHash("sha256").update(bytes).digest("hex");
   await mkdir(resolve(output), { recursive: true });

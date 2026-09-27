@@ -6,7 +6,7 @@ The Space reads accepted, generated views from the public [Explicit Edit Benchma
 
 Run `npm run build:snapshot` before serving locally. The build resolves the current Dataset commit, pins every file to that revision, checks published SHA-256 digests, and writes `dist/snapshot.json.gz` and `dist/snapshot-manifest.json`. Serve the app files together with these two files at the web root. The deploy workflow builds and publishes them with the Space.
 
-The Explorer is a public leaderboard for comparing how models and harnesses behave on precise text-editing tasks. Its header shows the number of published runs and the latest additions in the pinned Dataset index. Each addition opens that run's evidence inside the Explorer.
+The Explorer is a public leaderboard for comparing how models and harnesses behave on precise text-editing tasks. Its header shows the number of published runs and the latest additions in the pinned Dataset index. Each addition shows its acceptance commit date and the median score of full-benchmark configurations (or a dash if none are full), and opens that run's evidence inside the Explorer. The build reads commit history at the pinned Dataset revision; the browser never fetches it.
 
 We aim to make every visible result clickable. A number, model, harness, run, or summary should lead to its underlying detail, a useful filtered view, or its published source. Do not make something look interactive unless it goes somewhere useful.
 
