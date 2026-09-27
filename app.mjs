@@ -7,6 +7,7 @@ import {
   compareHarnessVersions,
   modelRouteIdentity,
   modelRouteLabel,
+  median,
   providerMedian,
   matrixHarnessGroup,
   moveColumn,
@@ -449,7 +450,6 @@ function matrixCells(configurationRows, compactRows, expandedHarnesses) {
   }
   const compactGroups = new Map();
   for (const row of compactRows) {
-    if (expandedHarnesses.has(row.harnessFamily)) continue;
     const model = modelRouteIdentity(row);
     const key = JSON.stringify([model, row.harnessFamily]);
     compactGroups.set(key, [...(compactGroups.get(key) ?? []), row]);
@@ -458,15 +458,22 @@ function matrixCells(configurationRows, compactRows, expandedHarnesses) {
     const [model, harness] = JSON.parse(key);
     const version = rows[0]?.harnessVersion ?? null;
     const runId = rows[0]?.runId ?? null;
-    visible.push(
-      matrixCell(model, harness, version, rows, {
-        columnKey: harness,
-        compact: true,
-        key: JSON.stringify([model, harness, version, runId]),
-        runId,
-        sourceRows: rows,
-      }),
-    );
+    const versions = configurationRows.filter((row) =>
+      modelRouteIdentity(row) === model && row.harnessFamily === harness);
+    const summary = matrixCell(model, harness, version, rows, {
+      columnKey: harness,
+      compact: true,
+      key: JSON.stringify([model, harness, version, runId]),
+      runId,
+      sourceRows: rows,
+    });
+    if (versions.length) {
+      summary.score = median(versions.map((row) => row.score));
+      summary.sourceRows = versions;
+      summary.observations = versions.reduce((total, row) => total + row.observations, 0);
+      Object.assign(summary, matrixMetricSummary(versions, summary.score));
+    }
+    visible.push(summary);
   }
   return [...overall, ...visible];
 }
@@ -624,7 +631,7 @@ function groupedMatrixCells(cells) {
   for (const cell of cells) add(cell);
   const columnGroups = new Map();
   for (const cell of cells) {
-    if (cell.overall) continue;
+    if (cell.overall || !cell.compact) continue;
     const label = matrixHarnessGroup(cell.harness);
     if ((label === "DeepSeek" && harnesses) || (label === "pi-extensions" && extensions)) {
       const key = JSON.stringify([cell.model, label]);
@@ -716,8 +723,10 @@ function renderMatrix(cells) {
       ...new Map(byHarness.get(harness).map((cell) => [cell.columnKey, cell])).values(),
     ];
     return state.expandedHarnesses.has(harness)
-      ? unique.sort((left, right) => compareHarnessVersions(left.version ?? "", right.version ?? ""))
-      : unique.slice(0, 1);
+      ? unique.sort((left, right) =>
+          Number(right.compact) - Number(left.compact) ||
+          compareHarnessVersions(right.version ?? "", left.version ?? ""))
+      : unique.filter((cell) => cell.compact).slice(0, 1);
   });
   const series = overall ? [overall, ...harnesses] : harnesses;
   const byPosition = new Map(cells.map((cell) => [`${cell.model}\0${cell.columnKey}`, cell]));
@@ -748,7 +757,7 @@ function renderMatrix(cells) {
       continue;
     }
     const expanded = state.expandedHarnesses.has(seriesCell.harness);
-    th.classList.toggle("matrix-expanded-head", expanded);
+    th.classList.toggle("matrix-expanded-head", expanded && seriesCell.compact);
     th.title = ["DeepSeek", "pi-extensions"].includes(seriesCell.harness)
       ? `${seriesCell.harness}\nMedian across the group's harnesses per provider route`
       : seriesCell.compact
@@ -761,7 +770,7 @@ function renderMatrix(cells) {
     columnLabel.className = "matrix-header-label";
     columnLabel.textContent = seriesCell.harness === "dsh-code" ? "DeepSeek codemode" :
       seriesCell.harness === "dsh-standard" ? "DeepSeek standard" :
-      expanded ? `${seriesCell.harness} ${seriesCell.version ?? "unknown"}` : seriesCell.harness;
+      seriesCell.compact ? seriesCell.harness : `${seriesCell.harness} ${seriesCell.version ?? "unknown"}`;
     columnButton.append(columnLabel);
     const detailsVersion = seriesCell.compact ? null : seriesCell.version;
     columnButton.title = `Open ${seriesCell.compact ? seriesCell.harness : seriesCell.label}`;
@@ -785,7 +794,7 @@ function renderMatrix(cells) {
         syncUrl(true);
       });
       actions.append(toggle, matrixGroupFilterButton(seriesCell.harness));
-    } else actions.append(matrixExpansionButton(seriesCell.harness));
+    } else if (seriesCell.compact) actions.append(matrixExpansionButton(seriesCell.harness));
     const filterName = seriesCell.compact ? "harness" : "harnessVersion";
     const filterValue = seriesCell.compact
       ? seriesCell.harness
