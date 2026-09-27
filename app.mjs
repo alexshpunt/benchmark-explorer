@@ -1,7 +1,7 @@
 import {
   aggregateGroupScore,
   aggregateLeaderboard,
-  aggregateRunConfigurations,
+  filterSnapshotRunRows,
   aggregateToolUsage,
   canonicalModelFamily,
   compareHarnessVersions,
@@ -15,18 +15,14 @@ import {
   observedMetricAverage,
   describeDistribution,
   latestHarnessConfigurations,
-  datasetRevision,
   explorerSearch,
   parseExplorerControls,
   parseExplorerState,
-  parseJsonLines,
-  pinnedDatasetRoot,
   popoverPosition,
   qualityPerDollar,
   relativeQualityPosition,
   precomputedFamilyScore,
   resolveHarnessVersion,
-  runBatches,
   taskFamily,
   toolTrialCounts,
   setViewsData,
@@ -128,6 +124,7 @@ const initialMatrixMetric = initialParams.has("metric")
     : "score";
 const state = {
   index: null,
+  snapshot: null,
   views: null,
   revision: null,
   profiles: [],
@@ -190,16 +187,6 @@ function setLoader(headline, progress, detail) {
 
 function hideLoader() {
   document.querySelector("#loader").hidden = true;
-}
-
-async function fetchGzipJsonLines(root, file, label) {
-  const response = await fetch(new URL(file.path, root), { cache: "no-store" });
-  if (!response.ok) throw new Error(`${label}: HTTP ${response.status}`);
-  const compressed = await response.arrayBuffer();
-  await verifyPublishedBytes(compressed, file.sha256);
-  const stream = new Blob([compressed]).stream().pipeThrough(new DecompressionStream("gzip"));
-  const rows = parseJsonLines(await new Response(stream).text());
-  return rows;
 }
 
 function filtersFromRoute(route) {
@@ -3008,13 +2995,7 @@ function render() {
     state.rounds,
     activeFilters(),
   );
-  const runRows = aggregateRunConfigurations(
-    state.index,
-    state.profiles,
-    state.trials,
-    state.rounds,
-    activeFilters(),
-  );
+  const runRows = filterSnapshotRunRows(state.snapshot, activeFilters());
   const compactRows = latestHarnessConfigurations(
     runRows,
     state.index.runs.map((run) => run.runId),
@@ -3235,70 +3216,48 @@ function buildFilterMenus(rows) {
   repositionFilterPopover();
 }
 async function load() {
-  if (typeof DecompressionStream === "undefined") {
+  if (typeof DecompressionStream === "undefined")
     throw new Error("This browser does not support gzip streams. Use a current browser.");
-  }
-  setStatus("loading", "Loading the latest dataset index…");
-  setLoader("Loading benchmark results…", 4, "Reading the dataset index");
-  const indexResponse = await fetch(DATASET_PAGE + "/resolve/main/dataset-index.json", {
-    cache: "no-store",
-  });
-  if (!indexResponse.ok) throw new Error(`Dataset index: HTTP ${indexResponse.status}`);
-  const revision = datasetRevision(indexResponse.headers);
-  const root = pinnedDatasetRoot(DATASET_PAGE, revision);
-  const indexText = await indexResponse.text();
-  const index = JSON.parse(indexText);
-  const viewsResponse = await fetch(new URL("views.json", root), { cache: "no-store" });
-  if (!viewsResponse.ok) throw new Error(`Dataset views: HTTP ${viewsResponse.status}`);
-  const viewsBytes = await viewsResponse.arrayBuffer();
-  await verifyPublishedBytes(viewsBytes, index.views?.sha256);
-  const viewsData = JSON.parse(new TextDecoder().decode(viewsBytes));
-  validateDatasetSnapshot(index, viewsData);
-  setViewsData(viewsData);
-  const preview = new URLSearchParams(location.search).get("testRuns") === "50";
-  const batches = runBatches(index.runs, preview ? 50 : null);
-  const total = batches.reduce((sum, batch) => sum + batch.length, 0);
-  state.index = { ...index, runs: [] };
-  state.revision = revision;
-  state.views = viewsData;
-  document.querySelector("#revision").textContent = revision.slice(0, 10);
-  document.querySelector("#freshness").textContent = new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date());
-  document.querySelector("#scoring-version").textContent = `v${viewsData.scoring.version}`;
+  setStatus("loading", "Loading published Explorer snapshot…");
+  setLoader("Loading benchmark results…", 5, "Reading the snapshot manifest");
+  const manifestResponse = await fetch("./snapshot-manifest.json", { cache: "no-store" });
+  if (!manifestResponse.ok) throw Error(`Snapshot manifest: HTTP ${manifestResponse.status}`);
+  const manifest = await manifestResponse.json();
+  if (manifest.schemaVersion !== 1 || !/^[a-f0-9]{40}$/.test(manifest.revision) ||
+      manifest.file !== "snapshot.json.gz") throw Error("Unsupported snapshot manifest");
+  const response = await fetch(`./${manifest.file}`, { cache: "no-store" });
+  if (!response.ok) throw Error(`Snapshot: HTTP ${response.status}`);
+  const bytes = await response.arrayBuffer();
+  await verifyPublishedBytes(bytes, manifest.sha256);
+  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("gzip"));
+  const snapshot = JSON.parse(await new Response(stream).text());
+  if (snapshot.schemaVersion !== 1 || snapshot.revision !== manifest.revision ||
+      !Array.isArray(snapshot.runRows?.all) || !Array.isArray(snapshot.trials) ||
+      snapshot.trials.length !== manifest.trials)
+    throw Error("Snapshot contents do not match the manifest");
+  validateDatasetSnapshot(snapshot.index, snapshot.views);
+  setViewsData(snapshot.views);
+  state.snapshot = snapshot;
+  state.index = snapshot.index;
+  state.views = snapshot.views;
+  state.revision = snapshot.revision;
+  state.profiles = snapshot.profiles;
+  state.trials = snapshot.trials;
+  state.rounds = snapshot.rounds;
+  state.toolCalls = snapshot.toolCalls;
+  document.querySelector("#revision").textContent = snapshot.revision.slice(0, 10);
+  document.querySelector("#freshness").textContent = "Published snapshot";
+  document.querySelector("#scoring-version").textContent = `v${snapshot.views.scoring.version}`;
   document.querySelector("#exclusion-policy").textContent =
-    viewsData.exclusions?.policyId ?? "none";
+    snapshot.views.exclusions?.policyId ?? "none";
+  document.querySelector("#observation-total").textContent = manifest.trials.toLocaleString();
   hideLoader();
-  setStatus("loading", `Published scores (all runs) · matrix evidence loading 0/${total}${preview ? " (50-run preview)" : ""}`);
+  setStatus("ready", `Published scores · ${snapshot.index.runs.length} runs · ${manifest.trials.toLocaleString()} trial records`);
   render();
   const initialCard = new URLSearchParams(location.search).get("card");
-  for (const batch of batches) {
-    const groups = await Promise.all(batch.flatMap((run) =>
-      ["profiles", "trials", "rounds", "tool-calls"].map(async (table) => ({
-        table,
-        rows: await fetchGzipJsonLines(root, run.files[table], `${run.runId}/${table}`),
-      })),
-    ));
-    for (const group of groups) {
-      const key = group.table === "tool-calls" ? "toolCalls" : group.table;
-      state[key].push(...group.rows);
-    }
-    state.index.runs.push(...batch);
-    const observations = state.trials.length.toLocaleString();
-    document.querySelector("#observation-total").textContent = observations;
-    setStatus("loading", `Published scores (all runs) · matrix evidence ${state.index.runs.length}/${total} runs · ${observations} trial records${preview ? " (50-run preview)" : ""}`);
-    render();
-    await new Promise((resolve) => setTimeout(resolve, 0));
-  }
-  setStatus("ready", `Published scores (all runs) · matrix evidence ${state.index.runs.length}/${index.runs.length} runs · ${state.trials.length.toLocaleString()} trial records${preview ? " (50-run preview)" : ""}`);
   if (initialCard) {
     restoringCard = true;
-    try {
-      openCard(initialCard);
-    } finally {
-      restoringCard = false;
-    }
+    try { openCard(initialCard); } finally { restoringCard = false; }
   }
   syncUrl();
 }

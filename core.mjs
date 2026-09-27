@@ -763,6 +763,15 @@ export function aggregateRunConfigurations(index, profiles, trials, rounds, filt
   });
 }
 
+/** Filter pre-aggregated run configurations without re-reading benchmark trials. */
+export function filterSnapshotRunRows(snapshot, filters = {}) {
+  const families = filters.taskFamily ?? [];
+  const rows = families.length === 1 ? snapshot.runRows[families[0]] ?? [] :
+    families.length ? aggregateRunConfigurations(snapshot.index, snapshot.profiles,
+      snapshot.trials, snapshot.rounds, { taskFamily: families }) : snapshot.runRows.all;
+  return rows.filter((row) => trialMatchesFilters(row, row.taskFamilies[0],
+    { ...filters, taskFamily: [] }));
+}
 function runIdToSubmission(index, runId) {
   const submissionId = index.runs.find((run) => run.runId === runId)?.submissionId;
   return submissionId ? [submissionId] : [];
