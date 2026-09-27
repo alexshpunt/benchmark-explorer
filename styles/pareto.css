@@ -60,6 +60,7 @@
   border-block: 1px solid var(--blue);
 }
 .pareto-range-key-harness::before { border-color: var(--amber); }
+.pareto-range-key-repeats::before { border-color: var(--muted); }
 .pareto-point { fill: var(--blue); stroke: var(--surface); stroke-width: 1.5; cursor: pointer; }
 .pareto-point:hover, .pareto-point:focus-visible { stroke: var(--text); stroke-width: 3; outline: none; }
 .pareto-point.pareto-model { fill: var(--surface); stroke: var(--blue); stroke-width: 2.5; }
@@ -87,6 +88,7 @@
 .pareto-tip span { font-family: var(--mono); font-size: var(--text-small); }
 .pareto-tip .pareto-tip-model-range { color: var(--blue); }
 .pareto-tip .pareto-tip-harness-range { color: var(--amber); }
+.pareto-tip .pareto-tip-route-range { color: var(--muted); }
 .pareto-side {
   min-height: 0;
   max-height: 470px;

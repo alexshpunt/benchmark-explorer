@@ -149,8 +149,9 @@
           <p>Squares: model routes × harnesses. Blue outlines: model medians; amber: harness medians.</p>
         </div>
         <div class="pareto-whisker-legend" aria-label="Score range whiskers">
-          <span class="pareto-range-key">Left: model route across harnesses</span>
-          <span class="pareto-range-key pareto-range-key-harness">Right: harness across models</span>
+          <span class="pareto-range-key pareto-range-key-repeats">Combination: repeated runs of latest full version</span>
+          <span class="pareto-range-key">Model: across harnesses</span>
+          <span class="pareto-range-key pareto-range-key-harness">Harness: across models</span>
         </div>
         <div class="pareto-layout">
           <div class="pareto-chart-wrap">
@@ -168,7 +169,7 @@
             <ol id="pareto-list"></ol>
           </aside>
         </div>
-        <p class="pareto-note">Only complete runs with a fully measured price are plotted. The line joins real, non-dominated combinations; model and harness medians do not change it. Each combination has two score ranges: the same model route across harnesses and the same harness across model routes, including full runs without a price. Summary squares show the spread of their routes. Click a square or list entry to compare up to four. Overlapping points can be chosen from Nearby points. Filters also apply here.</p>
+        <p class="pareto-note">Only combinations with a fully measured price are plotted; summaries need at least one priced route. The line joins real, non-dominated combinations; model and harness medians do not change it. Combination squares use the latest full harness version: their score and price are medians of independent runs, and a whisker appears only when repeated runs disagree. Model squares show score spread across harnesses; harness squares show spread across models. Summary scores and ranges include full runs without a price; summary prices use only measured routes, with coverage shown on hover. Click a square or list entry to compare up to four. Overlapping points can be chosen from Nearby points. Filters also apply here.</p>
       </section>
       <section class="summary-row" aria-label="Model route and harness matrix">
         <section class="panel matrix-panel">

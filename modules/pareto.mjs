@@ -36,18 +36,17 @@ export function createPareto(state, selectCell) {
     values.textContent = `Score ${score(point.score)} · Full run ${money(point.cost)}`;
     const sample = document.createElement("span");
     sample.textContent = `${point.runs} ${point.runs === 1 ? "run" : "runs"} · ${point.observations.toLocaleString()} trials` +
-      (point.routes ? ` · ${point.routes} routes` : "") +
-      (point.kind !== "route" && point.low < point.high
-        ? ` · score range ${score(point.low)}–${score(point.high)}` : "");
-    if (point.kind === "route") {
-      const modelRange = document.createElement("span");
-      modelRange.className = "pareto-tip-model-range";
-      modelRange.textContent = `Model across harnesses: ${score(point.modelRange.low)}–${score(point.modelRange.high)}`;
-      const harnessRange = document.createElement("span");
-      harnessRange.className = "pareto-tip-harness-range";
-      harnessRange.textContent = `Harness across models: ${score(point.harnessRange.low)}–${score(point.harnessRange.high)}`;
-      tooltip.append(title, kind, values, sample, modelRange, harnessRange);
-    } else tooltip.append(title, kind, values, sample);
+      (point.routes ? ` · ${point.routes} routes (${point.pricedRoutes} priced)` : "");
+    tooltip.append(title, kind, values, sample);
+    const range = point.kind === "route" ? point.runRange : point.range;
+    if (range) {
+      const detail = document.createElement("span");
+      detail.className = `pareto-tip-${point.kind}-range`;
+      detail.textContent = point.kind === "route"
+        ? `Repeated runs · ${point.version}: ${score(range.low)}–${score(range.high)}`
+        : `${point.kind === "model" ? "Across harnesses" : "Across models"}: ${score(range.low)}–${score(range.high)}`;
+      tooltip.append(detail);
+    }
     const hint = document.createElement("small");
     hint.textContent = state.selected.has(point.key) ? "Click to remove from comparison" : "Click to compare (up to 4)";
     tooltip.append(hint);
@@ -149,25 +148,20 @@ export function createPareto(state, selectCell) {
       return neighbors.length;
     }
     const whiskersByPoint = new Map();
-    function addWhisker(point, range, offset, kind) {
-      const xx = x(point.cost) + offset;
+    function addWhisker(point, range, kind) {
+      const xx = x(point.cost);
       const whisker = svg("g", { class: `pareto-whisker pareto-whisker-${kind}`,
         "data-point-key": point.key });
       whisker.append(svg("line", { x1: xx, x2: xx, y1: y(range.low), y2: y(range.high) }));
-      if (offset) whisker.append(svg("line", {
-        x1: xx, x2: x(point.cost), y1: y(point.score), y2: y(point.score),
-      }));
       for (const value of [range.low, range.high]) whisker.append(svg("line", {
         x1: xx - 4, x2: xx + 4, y1: y(value), y2: y(value),
       }));
       chart.append(whisker);
-      whiskersByPoint.set(point.key, [...(whiskersByPoint.get(point.key) ?? []), whisker]);
+      whiskersByPoint.set(point.key, whisker);
     }
     for (const point of orderedPoints) {
-      if (point.kind === "route") {
-        addWhisker(point, point.modelRange, -11, "model");
-        addWhisker(point, point.harnessRange, 11, "harness");
-      } else if (point.low < point.high) addWhisker(point, point, 0, "summary");
+      const range = point.kind === "route" ? point.runRange : point.range;
+      if (range) addWhisker(point, range, point.kind === "route" ? "repeats" : point.kind);
     }
     for (const point of orderedPoints) {
       const xx = x(point.cost);
@@ -178,12 +172,13 @@ export function createPareto(state, selectCell) {
           (frontierKeys.has(point.key) ? " pareto-frontier-point" : "") +
           (state.selected.has(point.key) ? " is-selected" : ""),
         "aria-label": `${pointName(point)}. Score ${score(point.score)}, full run ${money(point.cost)}.` +
-          (point.kind === "route" ? ` Model across harnesses ${score(point.modelRange.low)}–${score(point.modelRange.high)}.` +
-            ` Harness across models ${score(point.harnessRange.low)}–${score(point.harnessRange.high)}.` : "") + " Compare.",
+          (point.kind === "route" && point.runRange
+            ? ` Repeated full runs ${score(point.runRange.low)}–${score(point.runRange.high)}.` : "") +
+          (point.kind !== "route" && point.range
+            ? ` Range ${score(point.range.low)}–${score(point.range.high)}.` : "") + " Compare.",
         "aria-pressed": String(state.selected.has(point.key)) });
       const highlight = (active) => {
-        for (const whisker of whiskersByPoint.get(point.key) ?? [])
-          whisker.classList.toggle("is-active", active);
+        whiskersByPoint.get(point.key)?.classList.toggle("is-active", active);
         if (active) showTip(point, xx, yy, showNearby(point));
         else hideTip();
       };
