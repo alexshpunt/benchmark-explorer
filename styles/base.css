@@ -1,0 +1,519 @@
+/*
+ * Explicit Edit Explorer styles.
+ *
+ * Colours are the Hugging Face tokens: HF's gray ramp, black text on white in
+ * light mode, and HF's navy dark page colour (#0b0f19) in dark mode. Nothing
+ * here invents its own palette.
+ *
+ * The score scale in the matrix is a single green (best) to red (worst) ramp.
+ * modules/matrix.mjs computes both the per-cell bar colour and the legend gradient from
+ * the same stops, so the two can never drift apart.
+ *
+ * The four comparison series use the Okabe-Ito colour-blind safe hues, spread
+ * across the spectrum. Measured worst pairwise OKLab distance stays above 0.07
+ * after protanopia, deuteranopia and tritanopia simulation, several times the
+ * just-noticeable difference. Series also differ by marker shape.
+ */
+:root {
+  color-scheme: light;
+
+  /* Hugging Face gray ramp. */
+  --gray-50: oklch(98.5% 0.002 247.839);
+  --gray-100: oklch(96.7% 0.003 264.542);
+  --gray-200: oklch(92.8% 0.006 264.531);
+  --gray-300: oklch(87.2% 0.01 258.338);
+  --gray-400: oklch(70.7% 0.022 261.325);
+  --gray-500: oklch(55.1% 0.027 264.364);
+  --gray-700: oklch(37.3% 0.034 259.733);
+  --gray-800: oklch(27.8% 0.033 256.848);
+  --gray-925: #101623;
+  --gray-950: #0b0f19;
+  --blue-400: oklch(70.7% 0.165 254.624);
+  --blue-600: oklch(54.6% 0.245 262.881);
+
+  --page: #ffffff;
+  --surface: #ffffff;
+  --surface-muted: var(--gray-50);
+  --surface-hover: var(--gray-100);
+  --text: #000000;
+  --muted: var(--gray-500);
+  --faint: var(--gray-400);
+  --border: var(--gray-200);
+  --border-strong: var(--gray-300);
+
+  --blue: var(--blue-600);
+  --focus: var(--blue-600);
+  --green: oklch(59.6% 0.145 163.225);
+  --amber: oklch(64.6% 0.222 41.116);
+  --red: oklch(57.7% 0.245 27.325);
+  --red-soft: oklch(93.6% 0.032 17.717);
+
+  /*
+   * Comparison series: Okabe-Ito blue, vermillion, bluish green and reddish
+   * purple, on white. Contrast stays above 3:1 for every series.
+   */
+  --series-1: #0072b2;
+  --series-2: #d55e00;
+  --series-3: #009e73;
+  --series-4: #b0468a;
+  --plot-stroke: #ffffff;
+
+  --page-pad: 16px;
+  /* Spacing scale: the page inset, the gap between blocks, the padding inside a
+     panel or a table cell, and the space under a heading. */
+  --gap: 16px;
+  --pad-panel: 12px;
+  --pad-cell: 8px;
+  --pad-bar: 6px;
+  --gap-head: 8px;
+  /* One row height for every table on the page. */
+  --row-height: 38px;
+  --radius-sm: 6px;
+  --radius: 8px;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --sans:
+    "Source Sans Pro", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
+    "Noto Sans", Arial, sans-serif;
+  /* Type scale: four sizes, one role each, and the only sizes this file uses.
+     Monospace numerals read larger than sans at the same size, so the numbers
+     and the text beside them take different steps on purpose. */
+  --text-display: 18px; /* the page title */
+  --text-heading: 15px; /* panel, section, and dialog headings */
+  --text-body: 13px; /* every readable label, cell, button, and note */
+  --text-small: 12px; /* monospace numerals and dense small labels */
+  --leading-title: 24px;
+  --leading-body: 20px;
+  --leading-tight: 16px;
+  font-family: var(--sans);
+  color: var(--text);
+  background: var(--page);
+  font-synthesis: none;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --page: var(--gray-950);
+  --surface: var(--gray-950);
+  --surface-muted: var(--gray-925);
+  --surface-hover: #141c2e;
+  --text: var(--gray-200);
+  --muted: var(--gray-400);
+  --faint: var(--gray-500);
+  --border: var(--gray-800);
+  --border-strong: var(--gray-700);
+
+  --blue: var(--blue-400);
+  --focus: var(--blue-400);
+  --red-soft: oklch(25.8% 0.092 26.042);
+
+  /*
+   * The same four hue families, lifted for the dark page. Lightness is spread
+   * on purpose: under dichromacy lightness is what keeps the series apart.
+   */
+  --series-1: #6cb6f0;
+  --series-2: #ff9b60;
+  --series-3: #87e8bf;
+  --series-4: #d168a7;
+  --plot-stroke: #0b0f19;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+
+    --page: var(--gray-950);
+    --surface: var(--gray-950);
+    --surface-muted: var(--gray-925);
+    --surface-hover: #141c2e;
+    --text: var(--gray-200);
+    --muted: var(--gray-400);
+    --faint: var(--gray-500);
+    --border: var(--gray-800);
+    --border-strong: var(--gray-700);
+
+    --blue: var(--blue-400);
+    --focus: var(--blue-400);
+    --red-soft: oklch(25.8% 0.092 26.042);
+
+    --series-1: #6cb6f0;
+    --series-2: #ff9b60;
+    --series-3: #87e8bf;
+    --series-4: #d168a7;
+    --plot-stroke: #0b0f19;
+  }
+}
+
+/* --------------------------------------------------------------- loading */
+
+.loader {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 18px;
+  background: var(--page);
+}
+.loader[hidden] {
+  display: none;
+}
+/* A conic arc reads as motion far better than a plain ring. */
+.loader-ring {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, transparent 0 30%, var(--blue));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 4px));
+  animation: loader-spin 900ms linear infinite;
+}
+.loader-text {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-body);
+}
+.loader-bar {
+  width: 220px;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--surface-muted);
+}
+.loader-detail {
+  margin: 0;
+  color: var(--faint);
+  font-size: var(--text-small);
+}
+.loader-bar i {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--blue);
+  transition: width 220ms ease;
+}
+@keyframes loader-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .loader-ring {
+    animation-duration: 3s;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+html {
+  background: var(--page);
+}
+body {
+  margin: 0;
+  min-width: 320px;
+  overflow-x: hidden;
+  background: var(--page);
+  color: var(--text);
+  /* One type scale for the whole page: four steps, one role each. Every
+     font-size in this file is one of them, so text cannot drift apart. */
+  font-size: var(--text-body);
+  line-height: var(--leading-body);
+}
+button,
+input {
+  font: inherit;
+}
+button,
+a {
+  touch-action: manipulation;
+}
+a {
+  color: var(--blue);
+  text-underline-offset: 2px;
+}
+button:focus-visible,
+a:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+[hidden] {
+  display: none !important;
+}
+
+main {
+  width: 100%;
+}
+/* ---------------------------------------------------------------- status bar */
+
+.status-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  padding-inline: var(--page-pad);
+  border-bottom: 1px solid var(--border);
+}
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 10px 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-muted);
+  font-size: var(--text-body);
+  font-weight: 600;
+}
+.status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--green);
+}
+.status-badge:has(#load-status[data-kind="loading"]) .status-dot {
+  background: var(--amber);
+}
+#load-status[data-kind="error"] {
+  color: var(--red);
+}
+.status-meta {
+  margin: 0 0 0 auto;
+  display: flex;
+  gap: 20px;
+  font-size: var(--text-small);
+}
+.status-meta div {
+  min-width: 0;
+}
+.status-meta dt {
+  color: var(--faint);
+}
+.status-meta dd {
+  margin: 0;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: var(--text-small);
+}
+.error-help {
+  margin: 0;
+  color: var(--red);
+  font-size: var(--text-body);
+}
+
+/* ----------------------------------------------------------------- toolbar */
+
+.explorer-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 0 14px;
+  padding-inline: var(--page-pad);
+  border-bottom: 1px solid var(--border);
+}
+.toolbar-heading {
+  min-width: 0;
+}
+.explorer-toolbar h1 {
+  margin: 0;
+  font-size: var(--text-display);
+  font-weight: 600;
+  line-height: var(--leading-title);
+}
+.toolbar-heading p {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: var(--text-body);
+}
+.view-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 34px;
+  min-width: 32px;
+  padding: 0 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: var(--text-body);
+  font-weight: 500;
+  cursor: pointer;
+}
+.icon-button:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+.resource-link {
+  text-decoration: none;
+  white-space: nowrap;
+}
+.icon-button svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+}
+.active-filters {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.active-filters::-webkit-scrollbar {
+  display: none;
+}
+.active-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 4px 0 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-size: var(--text-body);
+  white-space: nowrap;
+}
+.active-filter b {
+  color: var(--faint);
+  font-weight: 500;
+}
+.active-filter span {
+  color: var(--text);
+  font-weight: 500;
+  max-width: 12rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.active-filter button {
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--faint);
+  font-size: var(--text-body);
+  line-height: 1;
+  cursor: pointer;
+}
+.active-filter button:hover {
+  background: var(--border);
+  color: var(--text);
+}
+
+/* ------------------------------------------------------------ section header */
+
+.results-section {
+  padding: 0;
+}
+.results-subhead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0;
+  padding-inline: var(--page-pad);
+  color: var(--muted);
+  font-size: var(--text-body);
+}
+.results-subhead p {
+  margin: 0;
+}
+.results-subhead a {
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------------- summary and panels */
+
+.summary-row {
+  display: grid;
+  /* One panel: the matrix holds the model totals and every harness beside them. */
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--gap);
+  padding: var(--gap) 0;
+  padding-inline: var(--page-pad);
+  border-bottom: 1px solid var(--border);
+}
+.panel {
+  min-width: 0;
+}
+/* Each panel is its own surface, so the page reads as a set of blocks. */
+.matrix-panel,
+.selection-block {
+  padding: var(--pad-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-muted);
+}
+.matrix-panel .matrix-shell {
+  border: 0;
+}
+.panel-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--pad-panel);
+  margin-bottom: var(--gap-head);
+}
+.panel-heading h2 {
+  margin: 0;
+  font-size: var(--text-heading);
+  font-weight: 600;
+}
+.panel-heading p {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-body);
+}
+.matrix-heading-meta {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.matrix-metric-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: var(--text-small);
+}
+.matrix-metric-control select {
+  min-height: 30px;
+  padding: 4px 24px 4px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+.panel-heading button {
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: var(--text-body);
+  cursor: pointer;
+}
+.panel-heading button:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}

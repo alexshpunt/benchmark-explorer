@@ -1,0 +1,69 @@
+/* ------------------------------------------------------------------- footer */
+
+footer {
+  margin: 24px var(--page-pad) 0;
+  padding: 16px 0 28px;
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: var(--text-body);
+}
+footer p {
+  margin: 0;
+}
+
+@media (max-width: 1000px) {
+  .summary-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 900px) {
+  :root {
+    --page-pad: 12px;
+  }
+  .status-bar {
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    padding-block: 10px;
+  }
+  .status-meta {
+    margin: 0;
+    width: 100%;
+    justify-content: space-between;
+  }
+  .explorer-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  .view-actions {
+    margin-left: 0;
+    overflow-x: auto;
+  }
+  .matrix-table {
+    min-width: 520px;
+  }
+  .selection-body {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "families"
+      "tools";
+  }
+  .matrix-legend {
+    justify-content: flex-start;
+  }
+  .details-metrics {
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  }
+  .filter-panel {
+    width: min(300px, calc(100vw - 24px));
+  }
+  footer {
+    margin: 20px var(--page-pad) 0;
+    flex-direction: column;
+    gap: 8px;
+  }
+}

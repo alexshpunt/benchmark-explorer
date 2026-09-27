@@ -1,0 +1,201 @@
+/* ------------------------------------------------------- leaderboard table */
+
+.table-guide {
+  max-width: 48rem;
+  margin: 0 var(--page-pad) 10px;
+  color: var(--muted);
+  font-size: var(--text-body);
+}
+.matrix-guide {
+  margin: 0 0 var(--gap-head);
+}
+.table-guide summary {
+  width: max-content;
+  color: var(--blue);
+  cursor: pointer;
+}
+.table-guide p {
+  margin: 6px 0 0;
+  line-height: 1.5;
+}
+.results-controls {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.column-settings {
+  position: relative;
+}
+.column-settings > summary {
+  min-height: 30px;
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  list-style: none;
+  white-space: nowrap;
+}
+.column-settings > summary::-webkit-details-marker {
+  display: none;
+}
+.column-settings-panel {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 5px);
+  right: 0;
+  width: 260px;
+  max-height: min(65vh, 560px);
+  padding: 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: 0 12px 28px rgb(0 0 0 / 14%);
+  overflow-y: auto;
+}
+.column-settings-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.column-settings-heading button {
+  padding: 3px 7px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.column-settings-panel > p {
+  margin: 5px 0 8px;
+  color: var(--muted);
+  font-size: var(--text-small);
+}
+.column-settings-list {
+  display: grid;
+  gap: 2px;
+}
+.column-setting {
+  position: relative;
+  min-height: 30px;
+  display: grid;
+  grid-template-columns: 20px 18px minmax(0, 1fr) 24px 24px;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 5px;
+  border-radius: var(--radius-sm);
+  cursor: grab;
+  user-select: none;
+}
+.column-setting:hover {
+  background: var(--surface-hover);
+}
+.column-setting.dragging {
+  opacity: 0.45;
+}
+.column-setting.column-drop-before::before,
+.column-setting.column-drop-after::after {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  left: 2px;
+  right: 2px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--blue);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--blue) 24%, transparent);
+  pointer-events: none;
+}
+.column-setting.column-drop-before::before {
+  top: -2px;
+}
+.column-setting.column-drop-after::after {
+  bottom: -2px;
+}
+.column-drag-handle {
+  color: var(--faint);
+  font-family: var(--mono);
+}
+.column-move {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.column-move:hover:not(:disabled),
+.column-move:focus-visible {
+  border-color: var(--border);
+  background: var(--surface-hover);
+  color: var(--text);
+}
+.column-move:disabled {
+  color: var(--faint);
+  cursor: default;
+}
+
+#range-filters {
+  flex: 1;
+}
+#range-filters:empty {
+  display: none;
+}
+
+/* Clickable table cells: plain text until hovered. */
+.cell-detail {
+  display: inline-block;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px dotted transparent;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-variant-numeric: inherit;
+  text-align: inherit;
+  cursor: pointer;
+}
+.cell-detail:hover,
+.cell-detail:focus-visible {
+  border-bottom-color: var(--faint);
+  color: var(--blue);
+}
+
+/* Column filter button, always visible next to the sort slot. */
+.column-filter {
+  display: inline-block;
+  vertical-align: middle;
+  width: 14px;
+  height: 14px;
+  margin: 0 0 0 5px;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--faint);
+  cursor: pointer;
+}
+.column-filter svg {
+  display: block;
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+.column-filter:hover,
+.column-filter:focus-visible {
+  color: var(--text);
+}
+.column-filter-active {
+  color: var(--blue);
+}

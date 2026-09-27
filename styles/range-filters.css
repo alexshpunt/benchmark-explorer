@@ -1,0 +1,55 @@
+/* Numeric range popover, shared by every numeric column header. */
+.range-panel {
+  display: block;
+  width: 250px;
+  padding: 12px;
+  max-width: calc(100vw - 24px);
+}
+.range-title {
+  margin: 0 0 4px;
+  font-size: var(--text-body);
+  font-weight: 600;
+}
+.range-note {
+  margin: 0 0 10px;
+  color: var(--muted);
+  font-size: var(--text-small);
+  line-height: 1.5;
+}
+.range-field {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: var(--text-small);
+}
+.range-field input {
+  width: 100%;
+  padding: 5px 7px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-body);
+}
+.range-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+.range-actions button {
+  flex: 1;
+  padding: 6px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-body);
+  cursor: pointer;
+}
+.range-actions button[type="submit"] {
+  border-color: var(--border-strong);
+  color: var(--text);
+}

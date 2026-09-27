@@ -1,0 +1,222 @@
+.cell-details {
+  /* Wide enough that a metric row stays on one line. */
+  width: min(880px, calc(100vw - 24px));
+  max-height: calc(100vh - 24px);
+  padding: 20px;
+  overflow: auto;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 18px 50px rgb(0 0 0 / 25%);
+}
+.cell-details::backdrop {
+  background: rgb(0 0 0 / 35%);
+}
+.cell-details-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+.cell-details-heading h2 {
+  margin: 0;
+  font-size: var(--text-heading);
+}
+.cell-details-heading p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: var(--text-body);
+}
+/* Header tokens are links, so they must look like links before hover. */
+.cell-details-heading .details-link {
+  text-decoration: underline;
+  text-decoration-color: var(--border-strong);
+  text-underline-offset: 2px;
+}
+.cell-details-heading .details-link:hover {
+  text-decoration-color: currentColor;
+}
+/* Grid centring keeps the glyph on the optical centre of the button. */
+.cell-details-heading .dialog-close {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: var(--text-heading);
+  line-height: 1;
+  cursor: pointer;
+}
+.cell-details-heading .dialog-close:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+.details-section {
+  margin-top: 18px;
+}
+.details-section h3 {
+  margin: 0 0 6px;
+  font-size: var(--text-heading);
+}
+.details-section p {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: var(--text-body);
+  line-height: 1.5;
+}
+/* auto-fit fits every observed value on one line when the width allows. Cells
+   draw their own borders, so a short last row leaves no grey hole. */
+.details-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.details-metrics div {
+  padding: 10px;
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+.details-metrics dt {
+  color: var(--muted);
+  font-size: var(--text-small);
+}
+.details-metrics dd {
+  margin: 3px 0 0;
+  font-family: var(--mono);
+  font-size: var(--text-body);
+  font-weight: 600;
+}
+.details-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-body);
+  font-variant-numeric: tabular-nums;
+}
+.details-table th,
+.details-table td {
+  padding: 6px 8px;
+  border-top: 1px solid var(--border);
+  text-align: right;
+  white-space: nowrap;
+}
+.details-table thead th {
+  color: var(--muted);
+  font-weight: 600;
+}
+.details-table thead th:first-child,
+.details-table tbody th {
+  font-family: var(--mono);
+  font-size: var(--text-small);
+  font-weight: 500;
+  text-align: left;
+  white-space: normal;
+}
+.distribution-track {
+  position: relative;
+  height: 10px;
+  margin: 2px 0 8px;
+  border-radius: 999px;
+  background: var(--surface-muted);
+}
+.distribution-band {
+  position: absolute;
+  inset-block: 0;
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--blue), transparent 70%);
+}
+.distribution-median {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--text);
+}
+.distribution-legend {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: var(--text-small);
+}
+.details-scroll {
+  max-height: 260px;
+  margin-top: 8px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.details-scroll .details-table th,
+.details-scroll .details-table td {
+  padding: 4px 8px;
+}
+.details-scroll .details-table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+}
+.details-link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.details-link:hover,
+.details-link:focus-visible {
+  color: var(--blue);
+  text-decoration: underline;
+}
+.details-sources {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-family: var(--mono);
+  font-size: var(--text-small);
+}
+.details-sources li {
+  padding: 7px 0;
+  overflow-wrap: anywhere;
+  border-top: 1px solid var(--border);
+}
+.details-sources a {
+  color: var(--blue);
+  overflow-wrap: anywhere;
+}
+.details-note {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-family: var(--sans);
+}
+.details-actions {
+  margin-top: 18px;
+}
+/* Same quiet button language as the toolbar: a border and muted text, not a
+   solid accent fill that glares against the page. */
+.details-actions button {
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--muted);
+  font: inherit;
+  font-size: var(--text-body);
+  cursor: pointer;
+}
+.details-actions button:hover,
+.details-actions button:focus-visible {
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
+  color: var(--text);
+}

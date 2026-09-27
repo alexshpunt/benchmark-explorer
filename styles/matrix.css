@@ -1,0 +1,284 @@
+/* ------------------------------------------------------------------- matrix */
+
+.matrix-shell {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  scrollbar-color: var(--border-strong) transparent;
+  scrollbar-width: thin;
+}
+.matrix-shell::-webkit-scrollbar {
+  height: 7px;
+}
+.matrix-shell::-webkit-scrollbar-track {
+  background: transparent;
+}
+.matrix-shell::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: var(--border-strong);
+}
+.matrix-shell.can-scroll-right {
+  box-shadow: inset -12px 0 10px -12px rgb(0 0 0 / 45%);
+}
+.matrix-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: var(--text-body);
+  font-variant-numeric: tabular-nums;
+}
+.matrix-table th,
+.matrix-table td {
+  min-height: calc(var(--row-height) + 12px);
+  padding: 0;
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  text-align: center;
+}
+.matrix-table tr:last-child > * {
+  border-bottom: 0;
+}
+.matrix-table tr > *:last-child {
+  border-right: 0;
+}
+.matrix-table thead th {
+  min-height: calc(var(--row-height) + 12px);
+  padding: 0;
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: var(--text-body);
+  font-weight: 500;
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+/* The overall column summarises the row, so it reads as a label, not a button. */
+.matrix-overall-head {
+  width: 6rem;
+  padding-inline: var(--pad-cell) !important;
+  color: var(--text);
+}
+.matrix-model-column {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  width: 10rem;
+}
+/* A continuous left stripe ties the model summary to its provider rows. */
+.matrix-table tbody .matrix-expanded-model::before {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  bottom: -1px;
+  left: 0;
+  width: 2px;
+  background: var(--blue);
+  pointer-events: none;
+}
+.matrix-table thead .matrix-model-column {
+  z-index: 3;
+  background: var(--surface);
+}
+.matrix-model-column::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--border-strong);
+  pointer-events: none;
+}
+.matrix-shell.can-scroll-left .matrix-model-column::after {
+  box-shadow: 5px 0 8px rgb(0 0 0 / 28%);
+}
+.matrix-table tbody th {
+  width: 10rem;
+  padding: 0;
+  background: var(--surface);
+  color: var(--text);
+  text-align: left;
+  font-family: var(--mono);
+  font-size: var(--text-body);
+  font-weight: 500;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.matrix-table tbody th.matrix-model-column .matrix-header {
+  padding-right: 58px;
+}
+/*
+ * Cells stay neutral: the score is plain text and the scale is carried by a
+ * thin bar under the number, so the table never turns into a colour patchwork.
+ */
+.matrix-cell {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: var(--text-body);
+}
+.matrix-cell::after {
+  content: "";
+  position: absolute;
+  right: 8px;
+  bottom: 4px;
+  left: 8px;
+  height: 2px;
+  background: var(--score-color, var(--border-strong));
+}
+.matrix-table td:hover {
+  background: var(--surface-hover);
+}
+/*
+ * A selected cell is a thin rectangle in the colour of its series. The frame
+ * says which comparison the cell belongs to; the score strip below the number
+ * keeps saying how good the score is.
+ */
+.matrix-table td.selected .matrix-cell {
+  box-shadow: inset 0 0 0 1px var(--selection-color, var(--blue));
+}
+.matrix-missing {
+  color: var(--faint);
+}
+.matrix-value-missing {
+  color: var(--faint);
+}
+.matrix-value-missing::after {
+  display: none;
+}
+/* Header labels open the model or harness behind the row or column. */
+.matrix-header {
+  width: 100%;
+  min-height: calc(var(--row-height) + 12px);
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 0 32px 0 8px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: inherit;
+  text-align: inherit;
+  cursor: pointer;
+}
+.matrix-header-label {
+  display: block;
+  padding-block: var(--pad-cell);
+  overflow-wrap: anywhere;
+  line-height: 1.2;
+  white-space: normal;
+}
+.matrix-table tbody .matrix-header {
+  justify-content: flex-start;
+}
+.matrix-table thead th:not(.matrix-model-column) {
+  position: relative;
+}
+.matrix-quick-filter {
+  position: absolute;
+  top: 50%;
+  right: 5px;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--faint);
+  cursor: pointer;
+  transform: translateY(-50%);
+}
+.matrix-table thead .matrix-header {
+  padding-right: 58px;
+}
+.matrix-header-actions {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  display: flex;
+  align-items: center;
+  transform: translateY(-50%);
+}
+.matrix-header-actions .matrix-quick-filter {
+  position: static;
+  transform: none;
+}
+.matrix-expand-toggle {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--blue);
+  cursor: pointer;
+  font: 600 20px/1 var(--sans);
+}
+.matrix-model-toggle span {
+  display: inline-block;
+  line-height: 1;
+}
+.matrix-model-toggle[aria-expanded="true"] span {
+  transform: rotate(90deg);
+}
+.matrix-expand-toggle:hover,
+.matrix-expand-toggle:focus-visible {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+.matrix-expanded-head {
+  box-shadow: inset 0 2px var(--blue);
+}
+.matrix-quick-filter:hover,
+.matrix-quick-filter:focus-visible {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+.matrix-quick-filter.active {
+  color: var(--blue);
+}
+.matrix-quick-filter svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+}
+.matrix-header:hover,
+.matrix-header:focus-visible {
+  background: var(--surface-hover);
+  color: var(--blue);
+}
+.matrix-legend {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 10px;
+  color: var(--faint);
+  font-size: var(--text-small);
+  font-variant-numeric: tabular-nums;
+}
+#matrix-scale-label {
+  margin-right: 2px;
+  color: var(--muted);
+  font-weight: 600;
+}
+.matrix-legend-ramp {
+  width: 120px;
+  height: 6px;
+  border-radius: 999px;
+}

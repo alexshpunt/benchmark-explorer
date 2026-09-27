@@ -1,0 +1,178 @@
+/* --------------------------------------------------------------- selection */
+
+.selection-panel {
+  padding: var(--gap) 0;
+  padding-inline: var(--page-pad);
+  border-bottom: 1px solid var(--border);
+}
+/* The comparison names what it shows and how to stop it. */
+.selection-bar {
+  margin-bottom: var(--gap);
+}
+/* The two comparison tables sit side by side and share the row. */
+.selection-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-areas: "families tools";
+  gap: var(--gap);
+  align-items: start;
+}
+.selection-block {
+  min-width: 0;
+}
+.selection-block-families {
+  grid-area: families;
+}
+.selection-block-tools {
+  grid-area: tools;
+}
+/*
+ * The header must fit a long model name in a narrow column, so it wraps instead
+ * of running into the neighbouring header. Its colour is painted on an inset
+ * layer, not on the cell, so the block is exactly as wide as the value bar
+ * below it and neighbouring headers keep the same gap as neighbouring bars.
+ */
+.tool-usage-table thead th.selection-head {
+  position: relative;
+  background: transparent;
+  white-space: normal;
+}
+.tool-usage-table thead th.selection-head::before {
+  position: absolute;
+  inset: 0 var(--pad-cell);
+  background: color-mix(in oklch, var(--selection-color, var(--blue)), transparent 84%);
+  content: "";
+}
+/* An inline-block button inside a table cell adds its own line box, which made
+   a two-line header twice as tall as the text in it. */
+.tool-usage-table thead th.selection-head .selection-label {
+  position: relative;
+  display: block;
+  /* The same inner padding the value bar uses, so the two texts line up. */
+  padding-inline: var(--pad-bar);
+  /* Two lines inside one row height. */
+  line-height: var(--leading-tight);
+}
+/* The harness names the column and the model separates two columns that share
+   a harness, so the harness leads and the longer model name follows it. */
+.selection-model,
+.selection-source,
+.selection-harness {
+  display: block;
+  overflow-wrap: break-word;
+}
+.selection-model {
+  color: var(--muted);
+  font-size: var(--text-small);
+  font-weight: 400;
+}
+.selection-source {
+  overflow: hidden;
+  color: var(--faint);
+  font-size: 10px;
+  font-weight: 400;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.selection-label {
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: inherit;
+  cursor: pointer;
+}
+.selection-label:hover,
+.selection-label:focus-visible {
+  color: var(--blue);
+  text-decoration: underline;
+}
+
+.tool-usage-section {
+  border-top: 1px solid var(--border);
+  margin-top: 20px;
+  padding-top: 16px;
+}
+.tool-usage-section h3 {
+  margin: 0;
+  font-size: var(--text-heading);
+}
+.tool-usage-shell {
+  margin-top: 10px;
+  overflow-x: auto;
+}
+.tool-usage-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: var(--text-body);
+}
+.tool-usage-table th,
+.tool-usage-table td {
+  height: var(--row-height);
+  padding: 0 var(--pad-cell);
+  border-top: 1px solid var(--border);
+  text-align: left;
+  vertical-align: middle;
+}
+.tool-usage-table thead th {
+  border-top: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tool-usage-table th:first-child {
+  width: 8.5rem;
+  font-family: var(--mono);
+  font-weight: 600;
+}
+.tool-usage-bar {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 5px var(--pad-bar);
+  overflow: hidden;
+  border: 0;
+  border-radius: 3px;
+  /* The track must differ from the panel behind it, or the bar reads as
+     shorter than the header above it. */
+  background: var(--border);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.tool-usage-bar:hover {
+  outline: 1px solid var(--blue);
+}
+.tool-usage-bar::before {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--bar-width);
+  background: color-mix(in oklch, var(--bar-color), transparent 72%);
+  content: "";
+}
+.tool-usage-bar span {
+  position: relative;
+  font-family: var(--mono);
+  font-size: var(--text-body);
+}
+/* A shape, not only a colour, marks the better and worse end of a row. */
+.tool-usage-mark {
+  position: relative;
+  margin-right: 5px;
+  font-size: var(--text-small);
+}
+.tool-usage-mark-best {
+  color: var(--green);
+}
+.tool-usage-mark-worst {
+  color: var(--red);
+}
+.tool-usage-missing {
+  color: var(--faint);
+}

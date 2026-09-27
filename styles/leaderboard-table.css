@@ -1,0 +1,152 @@
+#results-grid {
+  width: 100%;
+  /* Keep wide columns inside the leaderboard instead of widening the whole page. */
+  overflow-x: auto;
+  /* Same inset as every other block, so the table lines up with the page. */
+  padding-inline: var(--page-pad);
+  background: transparent;
+}
+.gridjs-container {
+  width: max-content !important;
+  min-width: 100% !important;
+  color: inherit !important;
+}
+.gridjs-head,
+.gridjs-footer {
+  display: none !important;
+}
+.gridjs-wrapper {
+  width: max-content !important;
+  min-width: 100% !important;
+  overflow: visible !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+.gridjs-table,
+.results-table-table {
+  width: max-content !important;
+  min-width: 100% !important;
+  table-layout: auto !important;
+  /* Separate borders keep the sticky header border visible while scrolling. */
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+}
+/* Flat table with the Hugging Face data-viewer layout, one type step larger. */
+.gridjs-th,
+.gridjs-td {
+  height: var(--row-height);
+  padding: 0 var(--pad-cell) !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--border) !important;
+  background: transparent !important;
+  color: var(--text) !important;
+  font-size: var(--text-body);
+  text-align: left;
+  white-space: nowrap !important;
+  font-variant-numeric: tabular-nums;
+}
+.gridjs-th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--page) !important;
+  border-bottom: 1px solid var(--border-strong) !important;
+  font-weight: 600;
+}
+.gridjs-th-sort {
+  cursor: pointer;
+}
+/* The label and the sort slot are equal-height inline boxes, so every header
+   shares one baseline. The slot is always reserved and only fades in. */
+.gridjs-th-content {
+  display: inline-block;
+  vertical-align: middle;
+  height: 12px;
+  line-height: var(--leading-tight);
+}
+.gridjs-sort {
+  display: inline-block;
+  vertical-align: middle;
+  width: 10px;
+  height: 12px;
+  margin: 0 0 0 4px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--faint);
+  font-size: var(--text-small);
+  line-height: var(--leading-tight);
+  text-align: center;
+  pointer-events: none;
+}
+.gridjs-th-sort:hover .gridjs-sort,
+.gridjs-sort-asc,
+.gridjs-sort-desc {
+  color: var(--text);
+}
+.gridjs-sort::after {
+  content: "↕";
+}
+.gridjs-sort-asc::after {
+  content: "↑";
+}
+.gridjs-sort-desc::after {
+  content: "↓";
+}
+.gridjs-tr:last-child .gridjs-td {
+  border-bottom: 0 !important;
+}
+.gridjs-tr:hover .gridjs-td {
+  background: var(--surface-hover) !important;
+}
+/* Right-align every numeric column, even after the user moves it. */
+.gridjs-th[data-value-kind="number"],
+.gridjs-td[data-value-kind="number"] {
+  text-align: right;
+}
+.gridjs-th[data-column-id="#"],
+.gridjs-td[data-column-id="#"] {
+  width: 3rem;
+  color: var(--faint) !important;
+  font-weight: 400;
+}
+.gridjs-td[data-column-id="score"] {
+  font-weight: 600;
+}
+.gridjs-td[data-column-id="model"] {
+  max-width: 15rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gridjs-th[draggable="true"] {
+  cursor: grab;
+}
+.gridjs-th.column-dragging {
+  opacity: 0.45;
+}
+.gridjs-th.column-drop-before {
+  box-shadow: inset 3px 0 var(--blue);
+}
+.gridjs-th.column-drop-after {
+  box-shadow: inset -3px 0 var(--blue);
+}
+@media (forced-colors: active) {
+  .column-setting.column-drop-before::before,
+  .column-setting.column-drop-after::after {
+    height: 0;
+    border-top: 2px solid Highlight;
+    background: transparent;
+    box-shadow: none;
+    forced-color-adjust: none;
+  }
+  .gridjs-th.column-drop-before {
+    border-left: 3px solid Highlight !important;
+    box-shadow: none;
+  }
+  .gridjs-th.column-drop-after {
+    border-right: 3px solid Highlight !important;
+    box-shadow: none;
+  }
+}

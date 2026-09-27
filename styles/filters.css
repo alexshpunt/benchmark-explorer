@@ -1,0 +1,112 @@
+/* ------------------------------------------------------------ filter popover */
+
+.filter-popover:not(:popover-open) {
+  display: none;
+}
+.filter-popover {
+  /* inset: auto clears the UA popover default so left/top from JS win. */
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 6%),
+    0 12px 28px rgb(0 0 0 / 14%);
+  overflow: visible;
+}
+.filter-popover::backdrop {
+  background: transparent;
+}
+.filter-panel {
+  display: block;
+  width: 300px;
+  max-width: calc(100vw - 24px);
+  padding: 4px;
+  overflow-y: auto;
+}
+.matrix-group-options {
+  border-bottom: 1px solid var(--border-strong);
+  margin-bottom: 4px;
+  padding-bottom: 4px;
+}
+.matrix-group-options label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 6px 8px;
+  color: var(--text);
+  font-size: var(--text-body);
+  cursor: pointer;
+}
+.matrix-group-options label:hover {
+  background: var(--surface-hover);
+}
+.filter-categories,
+.filter-submenu {
+  min-width: 0;
+}
+.filter-back {
+  width: 100%;
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  margin-bottom: 2px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font-size: var(--text-body);
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.filter-back:hover {
+  background: var(--surface-hover);
+}
+.filter-category,
+.filter-value {
+  width: 100%;
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font-size: var(--text-body);
+  text-align: left;
+  cursor: pointer;
+}
+.filter-category:hover,
+.filter-value:hover {
+  background: var(--surface-hover);
+}
+.filter-value-label {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.filter-value-count {
+  color: var(--faint);
+  text-align: right;
+  font-size: var(--text-small);
+  font-variant-numeric: tabular-nums;
+}
+.filter-value-check {
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  accent-color: var(--blue);
+  cursor: pointer;
+}

@@ -12,7 +12,15 @@
       const theme = new URLSearchParams(window.location.search).get("__theme");
       if (theme === "light" || theme === "dark") document.documentElement.dataset.theme = theme;
     </script>
-    <link rel="stylesheet" href="./styles.css?v=model-provider-stripe-3" />
+    <link rel="stylesheet" href="./styles/base.css" />
+    <link rel="stylesheet" href="./styles/matrix.css" />
+    <link rel="stylesheet" href="./styles/comparison.css" />
+    <link rel="stylesheet" href="./styles/leaderboard-controls.css" />
+    <link rel="stylesheet" href="./styles/details.css" />
+    <link rel="stylesheet" href="./styles/range-filters.css" />
+    <link rel="stylesheet" href="./styles/leaderboard-table.css" />
+    <link rel="stylesheet" href="./styles/filters.css" />
+    <link rel="stylesheet" href="./styles/footer.css" />
     <script type="module" src="./app.mjs"></script>
   </head>
   <body>

@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "check": "node --check app.mjs && node --check core.mjs && node --check scripts/build-snapshot.mjs && node --test test/*.test.mjs",
+    "check": "node --check app.mjs && node --check core.mjs && for file in modules/*.mjs; do node --check \"$file\" || exit; done && node --check scripts/build-snapshot.mjs && node --test test/*.test.mjs",
     "build:snapshot": "node scripts/build-snapshot.mjs"
   }
 }

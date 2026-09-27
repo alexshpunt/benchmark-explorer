@@ -30,7 +30,8 @@ jobs:
         run: |
           test -n "$HF_TOKEN"
           mkdir -p .space
-          cp app.mjs core.mjs index.html styles.css .space/
+          cp app.mjs core.mjs index.html .space/
+          cp -R modules styles .space/
           cp dist/snapshot.json.gz dist/snapshot-manifest.json .space/
           cp -R vendor .space/vendor
           cp SPACE.md .space/README.md
