@@ -148,6 +148,10 @@
           </div>
           <p>Squares: model routes × harnesses. Blue outlines: model medians; amber: harness medians.</p>
         </div>
+        <div class="pareto-whisker-legend" aria-label="Score range whiskers">
+          <span class="pareto-range-key">Model route across harnesses</span>
+          <span class="pareto-range-key pareto-range-key-harness">Harness across models</span>
+        </div>
         <div class="pareto-layout">
           <div class="pareto-chart-wrap">
             <div id="pareto-chart" role="region" aria-label="Price and score chart"></div>
@@ -159,7 +163,7 @@
             <ol id="pareto-list"></ol>
           </aside>
         </div>
-        <p class="pareto-note">Only complete runs with a fully measured price are plotted. The line joins real, non-dominated combinations; model and harness medians do not change it. Whiskers show the lowest and highest score behind each point. Click a square or list entry to compare up to four; filters also apply here.</p>
+        <p class="pareto-note">Only complete runs with a fully measured price are plotted. The line joins real, non-dominated combinations; model and harness medians do not change it. Each combination has two score ranges: the same model route across harnesses and the same harness across model routes, including full runs without a price. Summary squares show the spread of their routes. Click a square or list entry to compare up to four; filters also apply here.</p>
       </section>
       <section class="summary-row" aria-label="Model route and harness matrix">
         <section class="panel matrix-panel">

@@ -13,12 +13,27 @@ export function paretoPoints(cells) {
       return { cell, runs, cost: runs.length && runs.every(priced)
         ? median(runs.map((row) => row.cost.total)) : null };
     }).filter(({ runs }) => runs.length);
+  const ranges = (keyOf) => {
+    const groups = new Map();
+    for (const { cell } of routes) {
+      if (!Number.isFinite(cell.score)) continue;
+      const key = keyOf(cell);
+      groups.set(key, [...(groups.get(key) ?? []), cell.score]);
+    }
+    return new Map([...groups].map(([key, scores]) => [key, span(scores)]));
+  };
+  const models = ranges((cell) => cell.model);
+  const harnesses = ranges((cell) => cell.harness);
   const points = routes.filter(({ cell, cost }) => Number.isFinite(cell.score) && cost != null)
-    .map(({ cell, runs, cost }) => ({
-      kind: "route", key: cell.key, cell, model: modelOf(cell), provider: cell.model.split("\t")[1],
-      harness: cell.harness, score: cell.score, cost, ...span(runs.map((row) => row.score)),
-      runs: new Set(runs.map((row) => row.runId)).size, observations: runs.reduce((n, row) => n + row.observations, 0),
-    }));
+    .map(({ cell, runs, cost }) => {
+      const modelRange = models.get(cell.model);
+      const harnessRange = harnesses.get(cell.harness);
+      return { kind: "route", key: cell.key, cell, model: modelOf(cell), provider: cell.model.split("\t")[1],
+        harness: cell.harness, score: cell.score, cost, modelRange, harnessRange,
+        low: Math.min(modelRange.low, harnessRange.low), high: Math.max(modelRange.high, harnessRange.high),
+        runs: new Set(runs.map((row) => row.runId)).size,
+        observations: runs.reduce((n, row) => n + row.observations, 0) };
+    });
   const byAxis = (axis) => {
     const groups = new Map();
     for (const route of routes) {

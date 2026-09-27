@@ -34,11 +34,21 @@ export function createPareto(state, selectCell) {
     const sample = document.createElement("span");
     sample.textContent = `${point.runs} ${point.runs === 1 ? "run" : "runs"} · ${point.observations.toLocaleString()} trials` +
       (point.routes ? ` · ${point.routes} routes` : "") +
-      (point.low < point.high ? ` · score range ${score(point.low)}–${score(point.high)}` : "");
+      (point.kind !== "route" && point.low < point.high
+        ? ` · score range ${score(point.low)}–${score(point.high)}` : "");
+    if (point.kind === "route") {
+      const modelRange = document.createElement("span");
+      modelRange.className = "pareto-tip-model-range";
+      modelRange.textContent = `Model across harnesses: ${score(point.modelRange.low)}–${score(point.modelRange.high)}`;
+      const harnessRange = document.createElement("span");
+      harnessRange.className = "pareto-tip-harness-range";
+      harnessRange.textContent = `Harness across models: ${score(point.harnessRange.low)}–${score(point.harnessRange.high)}`;
+      tooltip.append(title, kind, values, sample, modelRange, harnessRange);
+    } else tooltip.append(title, kind, values, sample);
     const hint = document.createElement("small");
     hint.textContent = state.selected.has(point.key) ? "Click to remove from comparison" : "Click to compare (up to 4)";
-    tooltip.append(title, kind, values, sample, hint);
-    tooltip.style.left = `${Math.max(8, Math.min(x + 18, host.clientWidth - 280))}px`;
+    tooltip.append(hint);
+    tooltip.style.left = `${Math.max(8, Math.min(x + 18, host.clientWidth - 320))}px`;
     tooltip.style.top = `${Math.max(8, y - 16)}px`;
     tooltip.hidden = false;
   }
@@ -105,31 +115,51 @@ export function createPareto(state, selectCell) {
       class: "pareto-line", fill: "none",
     }));
     const frontierKeys = new Set(frontier.map((p) => p.key));
-    for (const point of [...points.filter((p) => !frontierKeys.has(p.key)), ...frontier]) {
+    const orderedPoints = [...points.filter((p) => !frontierKeys.has(p.key)), ...frontier];
+    const whiskersByPoint = new Map();
+    function addWhisker(point, range, offset, kind) {
+      const xx = x(point.cost) + offset;
+      const whisker = svg("g", { class: `pareto-whisker pareto-whisker-${kind}`,
+        "data-point-key": point.key });
+      whisker.append(svg("line", { x1: xx, x2: xx, y1: y(range.low), y2: y(range.high) }));
+      for (const value of [range.low, range.high]) whisker.append(svg("line", {
+        x1: xx - 4, x2: xx + 4, y1: y(value), y2: y(value),
+      }));
+      chart.append(whisker);
+      whiskersByPoint.set(point.key, [...(whiskersByPoint.get(point.key) ?? []), whisker]);
+    }
+    for (const point of orderedPoints) {
+      if (point.kind === "route") {
+        addWhisker(point, point.modelRange, -11, "model");
+        addWhisker(point, point.harnessRange, 11, "harness");
+      } else if (point.low < point.high) addWhisker(point, point, 0, "summary");
+    }
+    for (const point of orderedPoints) {
       const xx = x(point.cost);
       const yy = y(point.score);
-      if (point.low < point.high) {
-        const whisker = svg("g", { class: "pareto-whisker" });
-        whisker.append(svg("line", { x1: xx, x2: xx, y1: y(point.low), y2: y(point.high) }));
-        for (const value of [point.low, point.high]) whisker.append(svg("line", {
-          x1: xx - 4, x2: xx + 4, y1: y(value), y2: y(value),
-        }));
-        chart.append(whisker);
-      }
       const size = frontierKeys.has(point.key) ? 14 : point.kind === "route" ? 12 : 16;
       const mark = svg("rect", { x: xx - size / 2, y: yy - size / 2, width: size, height: size,
         rx: 2, tabindex: 0, role: "button", class: `pareto-point pareto-${point.kind}` +
           (frontierKeys.has(point.key) ? " pareto-frontier-point" : "") +
           (state.selected.has(point.key) ? " is-selected" : ""),
-        "aria-label": `${pointName(point)}. Score ${score(point.score)}, full run ${money(point.cost)}. Compare.`,
+        "aria-label": `${pointName(point)}. Score ${score(point.score)}, full run ${money(point.cost)}.` +
+          (point.kind === "route" ? ` Model across harnesses ${score(point.modelRange.low)}–${score(point.modelRange.high)}.` +
+            ` Harness across models ${score(point.harnessRange.low)}–${score(point.harnessRange.high)}.` : "") + " Compare.",
         "aria-pressed": String(state.selected.has(point.key)) });
-      mark.addEventListener("pointerenter", () => showTip(point, xx, yy));
-      mark.addEventListener("pointerleave", hideTip);
-      mark.addEventListener("focus", () => showTip(point, xx, yy));
-      mark.addEventListener("blur", hideTip);
-      mark.addEventListener("click", () => { hideTip(); selectCell(point.key); });
+      const highlight = (active) => {
+        for (const whisker of whiskersByPoint.get(point.key) ?? [])
+          whisker.classList.toggle("is-active", active);
+        if (active) showTip(point, xx, yy);
+        else hideTip();
+      };
+      mark.addEventListener("pointerenter", () => highlight(true));
+      mark.addEventListener("pointerleave", () => highlight(false));
+      mark.addEventListener("focus", () => highlight(true));
+      mark.addEventListener("blur", () => highlight(false));
+      const activate = () => { hideTip(); selectCell(point.key); };
+      mark.addEventListener("click", activate);
       mark.addEventListener("keydown", (event) => {
-        if (event.key === "Enter" || event.key === " ") { event.preventDefault(); mark.click(); }
+        if (event.key === "Enter" || event.key === " ") { event.preventDefault(); activate(); }
       });
       chart.append(mark);
     }
