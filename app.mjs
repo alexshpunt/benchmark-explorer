@@ -816,6 +816,8 @@ function renderMatrix(cells) {
     heading.scope = "row";
     const [modelFamily, provider] = model.split("\t");
     const modelLabel = provider ? `${modelFamily} · ${provider}` : modelFamily;
+    heading.classList.toggle("matrix-expanded-model",
+      state.matrixGroups.has("model") && state.expandedModels.has(modelFamily));
     heading.title = `Open ${modelLabel}`;
     const rowButton = document.createElement("button");
     rowButton.type = "button";
