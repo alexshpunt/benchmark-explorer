@@ -73,6 +73,12 @@ export function matrixAcrossModels(cells, column, rowsOf = (cell) => cell.source
     tokenObservations: representatives.reduce((sum, group) => sum + (group[0].tokenObservations ?? 0), 0),
   };
 }
+/** Best single incomplete run in a cell, measured against the published task set. */
+export function matrixPartialCoverage(rows, total) {
+  if (!total || rows.some((row) => row.fullBenchmark)) return null;
+  const count = Math.max(0, ...rows.map((row) => row.taskCount ?? 0));
+  return count ? { count: Math.min(count, total), total } : null;
+}
 /** Create the matrix with shared state and actions supplied by the entry point. */
 export function createMatrix(state, {
   mean, OVERALL, COLORS, selectedValues, syncUrl, render, renderMatrixState,
@@ -94,7 +100,8 @@ export function createMatrix(state, {
   }
 
   function matrixCell(model, harness, version, rows, options = {}) {
-    const score = mean(rows.map((row) => row.score).filter((value) => value != null));
+    const full = rows.filter((row) => row.fullBenchmark);
+    const score = mean(full.map((row) => row.score).filter((value) => value != null));
     return {
       key: options.key ?? cellKey(model, harness, version),
       columnKey: options.columnKey ?? `${harness}@${version ?? "unknown"}`,
@@ -106,14 +113,14 @@ export function createMatrix(state, {
       compact: options.compact === true,
       label: `${harness}@${version ?? "unknown"}`,
       score,
-      firstExactRate: aggregateGroupScore(rows.map((row) => ({ ...row, fullBenchmark: true }))).firstExactRate,
-      finalExactRate: mean(rows.map((row) => row.finalExactRate).filter((value) => value != null)),
-      recoveryGain: mean(rows.map((row) => row.recoveryGain).filter((value) => value != null)),
+      firstExactRate: aggregateGroupScore(full).firstExactRate,
+      finalExactRate: mean(full.map((row) => row.finalExactRate).filter((value) => value != null)),
+      recoveryGain: mean(full.map((row) => row.recoveryGain).filter((value) => value != null)),
       duration: mean(
-        rows.map((row) => row.durationSummary.averageCase).filter((value) => value != null),
+        full.map((row) => row.durationSummary.averageCase).filter((value) => value != null),
       ),
-      observations: rows.reduce((sum, row) => sum + row.observations, 0),
-      ...matrixMetricSummary(rows, score),
+      observations: full.reduce((sum, row) => sum + row.observations, 0),
+      ...matrixMetricSummary(full, score),
     };
   }
 
@@ -532,6 +539,12 @@ export function createMatrix(state, {
       headRow.append(th);
     }
     head.append(headRow);
+    const benchmarkTasks = Math.max(0, ...(state.snapshot?.views?.leaderboard ?? [])
+      .map((row) => row.benchmarkTaskCount ?? 0));
+    const allRuns = new Map((state.snapshot?.runRows?.all ?? []).map((row) =>
+      [`${row.runId}\t${row.configurationHash}`, row]));
+    const coverageFor = (cell) => matrixPartialCoverage(rowsForCell(cell).map((row) =>
+      allRuns.get(`${row.runId}\t${row.configurationHash}`) ?? row), benchmarkTasks);
     function renderValue(cell, modelLabel) {
       const td = document.createElement("td");
       if (!cell) {
@@ -552,7 +565,16 @@ export function createMatrix(state, {
       if (value == null) {
         button.textContent = "—";
         button.classList.add("matrix-value-missing");
-        button.title = `${modelLabel}\n${source}${note}\n${metric.label}: not reported\n${chosen ? "Selected — click to remove" : "Click to compare"}`;
+        const coverage = state.matrixMetric === "score" ? coverageFor(cell) : null;
+        if (coverage) {
+          button.classList.add("matrix-partial-coverage");
+          const count = document.createElement("small");
+          count.textContent = `${coverage.count}/${coverage.total}`;
+          button.append(count);
+        }
+        button.title = `${modelLabel}\n${source}${note}\n${metric.label}: not reported` +
+          (coverage ? `\nMost complete single run: ${coverage.count}/${coverage.total} tasks` : "") +
+          `\n${chosen ? "Selected — click to remove" : "Click to compare"}`;
       } else {
         button.style.setProperty("--score-color",
           scoreColor(relativeQualityPosition(value, low, high, metric.higherIsBetter)));

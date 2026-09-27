@@ -266,11 +266,12 @@ export function createDetails(state, {
       detailTable(
         ["Configuration", "Score", "Trials"],
         rows
-          .toSorted((left, right) => right.score - left.score)
+          .toSorted((left, right) => Number(right.fullBenchmark) - Number(left.fullBenchmark) ||
+            (right.fullBenchmark ? right.score - left.score : right.taskCount - left.taskCount))
           .map((row) => ({
             cells: [
               configurationLabel(row),
-              `${(row.score * 100).toFixed(3)}${row.fullBenchmark ? "" : " (partial)"}`,
+              row.fullBenchmark ? (row.score * 100).toFixed(3) : "— (partial)",
               row.observations.toLocaleString(),
             ],
             onClick: () => openConfigurationDetails([row]),
@@ -529,13 +530,14 @@ export function createDetails(state, {
         (() => {
           const section = detailsSection("How this value is computed");
           const paragraph = document.createElement("p");
-          paragraph.textContent =
-            "Score = coverage × (0.75 × first exact rate + 0.25 × final exact rate).";
+          paragraph.textContent = single.fullBenchmark
+            ? "Score = coverage × (0.75 × first exact rate + 0.25 × final exact rate)."
+            : "This run is incomplete. Its task outcomes are available below, but it has no benchmark score.";
           section.append(
             paragraph,
             detailList([
               ["Coverage", percentText(single.coverage)],
-              ["Quality score", percentText(single.qualityScore)],
+              ...(single.fullBenchmark ? [["Quality score", percentText(single.qualityScore)]] : []),
               ["First exact rate", percentText(single.firstExactRate)],
               ["Final exact rate", percentText(single.finalExactRate)],
               ["Trials", single.observations.toLocaleString()],
@@ -745,6 +747,7 @@ export function createDetails(state, {
     paragraph.textContent =
       "The family score uses the same formula as the whole benchmark, but only the tasks of this family: coverage inside the family × (0.75 × first exact rate + 0.25 × final exact rate).";
     const scored = rows
+      .filter((row) => row.fullBenchmark)
       .map((row) => ({ row, score: familyScore(row, family) }))
       .filter((entry) => entry.score);
     const [only] = scored;
@@ -799,6 +802,7 @@ export function createDetails(state, {
 
     // Every visible configuration that ran this family, best first.
     const comparison = state.configurations
+      .filter((row) => row.fullBenchmark)
       .map((row) => ({ row, score: familyScore(row, family) }))
       .filter((entry) => entry.score)
       .toSorted((left, right) => right.score.score - left.score.score);

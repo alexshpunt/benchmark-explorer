@@ -173,6 +173,17 @@
 .matrix-value-missing::after {
   display: none;
 }
+.matrix-partial-coverage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+.matrix-partial-coverage small {
+  color: var(--muted);
+  font-size: var(--text-small);
+}
 /* Header labels open the model or harness behind the row or column. */
 .matrix-header {
   width: 100%;
