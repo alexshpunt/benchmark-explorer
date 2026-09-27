@@ -451,6 +451,11 @@ export function describeDistribution(values) {
   };
 }
 
+/** True only when a configuration covers the full published benchmark. */
+export function fullBenchmarkRun(row) {
+  return row.fullBenchmark === true ||
+    (row.fullBenchmark == null && row.complete === true && row.coverage === 1);
+}
 function mean(values) {
   return values.length ? values.reduce((total, value) => total + value, 0) / values.length : null;
 }
@@ -458,14 +463,11 @@ function mean(values) {
  * Score for the configurations that share one identity: a model, an agent, a
  * harness, or a reasoning mode.
  *
- * Trials are pooled per benchmark task, so a configuration that ran only a few
- * tasks adds evidence instead of dragging the group down. Averaging the
- * configuration scores instead let a one-task run cost a model 9.7 points while
- * contributing a single observation. Coverage is still the share of the
- * benchmark the group has been measured on at all, so a group without enough
- * evidence scores low rather than looking complete.
+ * Only configurations that cover the full published benchmark contribute to
+ * this score. Partial runs stay visible in individual configuration details.
  */
 export function aggregateGroupScore(rows) {
+  rows = rows.filter((row) => row.fullBenchmark !== false);
   if (!rows.length) {
     return {
       firstExactRate: null,
@@ -763,6 +765,15 @@ export function aggregateRunConfigurations(index, profiles, trials, rounds, filt
   });
 }
 
+/** Mark run rows against the published whole-benchmark task count, not their local task sets. */
+export function markFullBenchmarkRows(runRows, views) {
+  const benchmarkTasks = Math.max(0, ...views.leaderboard.map((row) => row.benchmarkTaskCount ?? 0));
+  const full = new Set(runRows.all.filter((row) => benchmarkTasks > 0 &&
+    row.taskCount === benchmarkTasks).map((row) => `${row.runId}\t${row.configurationHash}`));
+  for (const rows of Object.values(runRows)) for (const row of rows)
+    row.fullBenchmark = full.has(`${row.runId}\t${row.configurationHash}`);
+  return [...full];
+}
 /** Filter pre-aggregated run configurations without re-reading benchmark trials. */
 export function filterSnapshotRunRows(snapshot, filters = {}) {
   const families = filters.taskFamily ?? [];
@@ -801,6 +812,12 @@ export function aggregateLeaderboard(_index, _profiles, _trials, _rounds, filter
   const rows = families.length === 1
     ? precomputedViews.taskFamilies[families[0]] ?? []
     : precomputedViews.leaderboard;
+  const full = new Set(precomputedViews.fullRunKeys ??
+    precomputedViews.leaderboard.filter(fullBenchmarkRun)
+      .flatMap((row) => (row.runIds ?? []).flatMap((runId) =>
+        (row.configurationHashes ?? []).map((hash) => `${runId}\t${hash}`))));
+  const complete = (row) => (row.runIds ?? []).some((runId) =>
+    (row.configurationHashes ?? []).some((hash) => full.has(`${runId}\t${hash}`)));
   const selected = (actual, expected) => !expected?.length || expected.includes(actual);
   const filtered = rows.filter((row) =>
     selected(row.provider, filters.provider) &&
@@ -824,13 +841,15 @@ export function aggregateLeaderboard(_index, _profiles, _trials, _rounds, filter
     harness: "harnessFamily",
     duration: "durationSummary.averageCase",
   }[filters.sortBy] ?? filters.sortBy ?? "score";
-  const get = (row) => field.split(".").reduce((item, key) => item?.[key], row);
+  const get = (row) => field === "score" && !complete(row) ? null :
+    field.split(".").reduce((item, key) => item?.[key], row);
   return filtered.toSorted((left, right) => {
     const a = get(left);
     const b = get(right);
+    if (a == null || b == null) return Number(a == null) - Number(b == null);
     if (typeof a === "number" && typeof b === "number") return (a - b) * direction;
-    return String(a ?? "").localeCompare(String(b ?? "")) * direction;
-  });
+    return String(a).localeCompare(String(b)) * direction;
+  }).map((row) => ({ ...row, fullBenchmark: complete(row) }));
 }
 /** Build sorted filter choices from published run and profile identities. */
 export function filterOptions(index, profiles, trials) {

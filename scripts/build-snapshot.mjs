@@ -7,6 +7,7 @@ import {
   datasetRevision,
   parseJsonLines,
   pinnedDatasetRoot,
+  markFullBenchmarkRows,
   taskFamily,
   validateDatasetSnapshot,
   verifyPublishedBytes,
@@ -53,6 +54,7 @@ export async function buildSnapshot({ dataset = "https://huggingface.co/datasets
   const runRows = { all: aggregateRunConfigurations(index, evidence.profiles, evidence.trials, evidence.rounds) };
   for (const family of families) runRows[family] = aggregateRunConfigurations(
     index, evidence.profiles, evidence.trials, evidence.rounds, { taskFamily: [family] });
+  views.fullRunKeys = markFullBenchmarkRows(runRows, views);
   const snapshot = { schemaVersion: 1, revision, index, views, runRows, ...evidence };
   const bytes = gzipSync(JSON.stringify(snapshot), { level: 9 });
   const sha256 = createHash("sha256").update(bytes).digest("hex");

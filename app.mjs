@@ -385,7 +385,7 @@ function matrixCell(model, harness, version, rows, options = {}) {
     compact: options.compact === true,
     label: `${harness}@${version ?? "unknown"}`,
     score,
-    firstExactRate: aggregateGroupScore(rows).firstExactRate,
+    firstExactRate: aggregateGroupScore(rows.map((row) => ({ ...row, fullBenchmark: true }))).firstExactRate,
     finalExactRate: mean(rows.map((row) => row.finalExactRate).filter((value) => value != null)),
     recoveryGain: mean(rows.map((row) => row.recoveryGain).filter((value) => value != null)),
     duration: mean(
@@ -405,7 +405,8 @@ function matrixCells(configurationRows, compactRows, expandedHarnesses) {
   // The overall cell of a model pools its trials task by task, exactly like the
   // group score a model card reports.
   const overall = [...byModel].map(([model, rows]) => {
-    const group = aggregateGroupScore(rows);
+    const full = rows.filter((row) => row.fullBenchmark);
+    const group = aggregateGroupScore(full);
     return {
       key: cellKey(model, OVERALL, null),
       columnKey: OVERALL,
@@ -418,9 +419,9 @@ function matrixCells(configurationRows, compactRows, expandedHarnesses) {
       firstExactRate: group.firstExactRate,
       finalExactRate: group.finalExactRate,
       recoveryGain: null,
-      duration: mean(rows.map((row) => row.durationSummary.averageCase)),
-      observations: rows.reduce((sum, row) => sum + row.observations, 0),
-      ...matrixMetricSummary(rows, group.score),
+      duration: mean(full.map((row) => row.durationSummary.averageCase)),
+      observations: full.reduce((sum, row) => sum + row.observations, 0),
+      ...matrixMetricSummary(full, group.score),
     };
   });
   const visible = [];
@@ -451,14 +452,19 @@ function matrixCells(configurationRows, compactRows, expandedHarnesses) {
       columnKey: harness,
       compact: true,
       key: JSON.stringify([model, harness, version, runId]),
-      runId,
+      runId: null,
       sourceRows: rows,
     });
     if (versions.length) {
-      summary.score = median(versions.map((row) => row.score));
+      const full = versions.filter((row) => row.fullBenchmark);
+      summary.score = median(full.map((row) => row.score));
+      summary.firstExactRate = aggregateGroupScore(full).firstExactRate;
+      summary.finalExactRate = mean(full.map((row) => row.finalExactRate));
+      summary.recoveryGain = mean(full.map((row) => row.recoveryGain));
+      summary.duration = mean(full.map((row) => row.durationSummary.averageCase));
       summary.sourceRows = versions;
-      summary.observations = versions.reduce((total, row) => total + row.observations, 0);
-      Object.assign(summary, matrixMetricSummary(versions, summary.score));
+      summary.observations = full.reduce((total, row) => total + row.observations, 0);
+      Object.assign(summary, matrixMetricSummary(full, summary.score));
     }
     visible.push(summary);
   }
@@ -859,17 +865,19 @@ function renderMatrix(cells) {
         const source = cell.runId
           ? `${cell.label}\nRun: ${cell.runId}`
           : cell.label;
+        const note = !cell.overall && !cell.compact && rowsForCell(cell).every((row) => !row.fullBenchmark)
+          ? "\nPartial benchmark run; excluded from summary scores" : "";
         if (value == null) {
           button.textContent = "—";
           button.classList.add("matrix-value-missing");
-          button.title = `${modelLabel}\n${source}\n${metric.label}: not reported\n${chosen ? "Selected — click to remove" : "Click to compare"}`;
+          button.title = `${modelLabel}\n${source}${note}\n${metric.label}: not reported\n${chosen ? "Selected — click to remove" : "Click to compare"}`;
         } else {
           button.style.setProperty(
             "--score-color",
             scoreColor(relativeQualityPosition(value, low, high, metric.higherIsBetter)),
           );
           button.textContent = metric.format(value);
-          button.title = `${modelLabel}\n${source}\n${metric.label}: ${metric.format(value)}\n${metric.detail(cell)}\n${chosen ? "Selected — click to remove" : "Click to compare"}`;
+          button.title = `${modelLabel}\n${source}${note}\n${metric.label}: ${metric.format(value)}\n${metric.detail(cell)}\n${chosen ? "Selected — click to remove" : "Click to compare"}`;
         }
         button.setAttribute("aria-label", button.title.replaceAll("\n", ". "));
         button.addEventListener("click", () => toggleSelection(cell.key));
@@ -957,9 +965,9 @@ const COLUMNS = [
   {
     id: "score",
     name: "Score",
-    tooltip: "Coverage × (75% first exact rate + 25% final exact rate). Higher is better.",
-    cell: (row) => Number((row.score * 100).toFixed(3)),
-    range: { value: (row) => row.score * 100, decimals: 3, unit: "" },
+    tooltip: "Only complete benchmark runs receive a summary score. Partial runs remain visible in details.",
+    cell: (row) => row.fullBenchmark ? Number((row.score * 100).toFixed(3)) : "—",
+    range: { value: (row) => row.fullBenchmark ? row.score * 100 : null, decimals: 3, unit: "" },
     detail: {
       lines: [
         "Score = coverage × (0.75 × first exact rate + 0.25 × final exact rate).",
@@ -1795,7 +1803,8 @@ function provenanceSection(rows) {
 /** Score spread and the configurations behind a model, harness or cell. */
 function configurationListSection(rows, title) {
   const section = detailsSection(`${title} (${rows.length})`);
-  const summary = describeDistribution(rows.map((row) => row.score * 100).filter(Number.isFinite));
+  const summary = describeDistribution(rows.filter((row) => row.fullBenchmark)
+    .map((row) => row.score * 100));
   if (summary) {
     const line = document.createElement("p");
     line.textContent = `Score across them: min ${summary.min.toFixed(1)} · median ${summary.median.toFixed(1)} · max ${summary.max.toFixed(1)}.`;
@@ -1809,7 +1818,7 @@ function configurationListSection(rows, title) {
         .map((row) => ({
           cells: [
             configurationLabel(row),
-            (row.score * 100).toFixed(3),
+            `${(row.score * 100).toFixed(3)}${row.fullBenchmark ? "" : " (partial)"}`,
             row.observations.toLocaleString(),
           ],
           onClick: () => openConfigurationDetails([row]),
@@ -2043,7 +2052,7 @@ function openGroupDetails({ kind, card, title, identity, note, summary, rows, fi
   paragraph.textContent = note;
   const formula = document.createElement("p");
   formula.textContent =
-    "Score = coverage × (0.75 × first exact rate + 0.25 × final exact rate), with every trial of the group pooled per task, so a partial run adds evidence instead of pulling the group down.";
+    "Only runs covering the full benchmark count toward the summary score. Partial runs stay visible in the configurations below.";
   section.append(paragraph, formula, detailList(summary));
   setCard(card);
   const sources = sourceLinksSection(links);
@@ -2595,7 +2604,8 @@ function renderResultsTable(rows) {
   const host = document.querySelector("#results-grid");
   resultsGrid?.destroy();
   host.replaceChildren();
-  state.rows = rows.toSorted((left, right) => right.score - left.score);
+  state.rows = rows.toSorted((left, right) =>
+    Number(right.fullBenchmark) - Number(left.fullBenchmark) || right.score - left.score);
   const tableColumns = leaderboardColumns();
   const data = state.rows.map((row, index) => [
     ...tableColumns.map((column) => column.cell(row, index)),
@@ -2656,7 +2666,8 @@ function addOverflowTitles(host) {
  * one of its harnesses are measured the same way.
  */
 function pooledFamilyScore(rows, family) {
-  return aggregateGroupScore(rows.map((row) => familyScore(row, family)).filter(Boolean));
+  return aggregateGroupScore(rows.filter((row) => row.fullBenchmark)
+    .map((row) => familyScore(row, family)).filter(Boolean));
 }
 
 function familyEntry(cell, family) {
@@ -3001,7 +3012,8 @@ function render() {
     state.index.runs.map((run) => run.runId),
   );
   state.allRows = aggregateLeaderboard(state.index, state.profiles, state.trials, state.rounds, {});
-  state.configurations = configurationRows.toSorted((left, right) => right.score - left.score);
+  state.configurations = configurationRows.toSorted((left, right) =>
+    Number(right.fullBenchmark) - Number(left.fullBenchmark) || right.score - left.score);
   state.compactConfigurations = compactRows;
   state.matrixCellCache = new Map(
     matrixCells(state.configurations, state.compactConfigurations, new Set()).map((cell) => [
