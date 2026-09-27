@@ -18,11 +18,14 @@ export function createPareto(state, selectCell) {
   const list = document.querySelector("#pareto-list");
   const context = document.querySelector("#pareto-context");
   const tooltip = document.querySelector("#pareto-tip");
+  const nearbySection = document.querySelector("#pareto-nearby");
+  const nearbyList = document.querySelector("#pareto-nearby-list");
+  let nearbyKey = null;
   let current = null;
   let width = 0;
 
   function hideTip() { tooltip.hidden = true; }
-  function showTip(point, x, y) {
+  function showTip(point, x, y, nearbyCount = 0) {
     tooltip.replaceChildren();
     const title = document.createElement("strong");
     title.textContent = pointName(point);
@@ -48,6 +51,11 @@ export function createPareto(state, selectCell) {
     const hint = document.createElement("small");
     hint.textContent = state.selected.has(point.key) ? "Click to remove from comparison" : "Click to compare (up to 4)";
     tooltip.append(hint);
+    if (nearbyCount > 1) {
+      const nearbyHint = document.createElement("small");
+      nearbyHint.textContent = `${nearbyCount} nearby points — choose any from Nearby points`;
+      tooltip.append(nearbyHint);
+    }
     tooltip.style.left = `${Math.max(8, Math.min(x + 18, host.clientWidth - 320))}px`;
     tooltip.style.top = `${Math.max(8, y - 16)}px`;
     tooltip.hidden = false;
@@ -62,6 +70,8 @@ export function createPareto(state, selectCell) {
       `${frontier.length} on the frontier` + (unpriced ? ` · ${unpriced} without a complete price` : "");
     host.replaceChildren();
     list.replaceChildren();
+    nearbySection.hidden = true;
+    nearbyList.replaceChildren();
     hideTip();
     if (!points.length) {
       const empty = document.createElement("p");
@@ -115,13 +125,38 @@ export function createPareto(state, selectCell) {
       class: "pareto-line", fill: "none",
     }));
     const frontierKeys = new Set(frontier.map((p) => p.key));
-    const orderedPoints = [...points.filter((p) => !frontierKeys.has(p.key)), ...frontier];
+    const orderedPoints = [...points.filter((p) => p.kind !== "route"),
+      ...points.filter((p) => p.kind === "route" && !frontierKeys.has(p.key)), ...frontier];
+    function showNearby(point) {
+      nearbyKey = point.key;
+      const neighbors = orderedPoints.filter((candidate) =>
+        Math.abs(x(candidate.cost) - x(point.cost)) <= 18 &&
+        Math.abs(y(candidate.score) - y(point.score)) <= 18);
+      nearbyList.replaceChildren();
+      nearbySection.hidden = neighbors.length < 2;
+      for (const candidate of neighbors) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "pareto-nearby-item";
+        button.setAttribute("aria-pressed", String(state.selected.has(candidate.key)));
+        button.textContent = pointName(candidate);
+        const values = document.createElement("span");
+        values.textContent = `${score(candidate.score)} · ${money(candidate.cost)}`;
+        button.append(values);
+        button.addEventListener("click", () => selectCell(candidate.key));
+        nearbyList.append(button);
+      }
+      return neighbors.length;
+    }
     const whiskersByPoint = new Map();
     function addWhisker(point, range, offset, kind) {
       const xx = x(point.cost) + offset;
       const whisker = svg("g", { class: `pareto-whisker pareto-whisker-${kind}`,
         "data-point-key": point.key });
       whisker.append(svg("line", { x1: xx, x2: xx, y1: y(range.low), y2: y(range.high) }));
+      if (offset) whisker.append(svg("line", {
+        x1: xx, x2: x(point.cost), y1: y(point.score), y2: y(point.score),
+      }));
       for (const value of [range.low, range.high]) whisker.append(svg("line", {
         x1: xx - 4, x2: xx + 4, y1: y(value), y2: y(value),
       }));
@@ -149,7 +184,7 @@ export function createPareto(state, selectCell) {
       const highlight = (active) => {
         for (const whisker of whiskersByPoint.get(point.key) ?? [])
           whisker.classList.toggle("is-active", active);
-        if (active) showTip(point, xx, yy);
+        if (active) showTip(point, xx, yy, showNearby(point));
         else hideTip();
       };
       mark.addEventListener("pointerenter", () => highlight(true));
@@ -164,6 +199,11 @@ export function createPareto(state, selectCell) {
       chart.append(mark);
     }
     host.append(chart);
+    if (nearbyKey) {
+      const previous = points.find((point) => point.key === nearbyKey);
+      if (previous) showNearby(previous);
+      else nearbyKey = null;
+    }
     for (const point of [...frontier].reverse()) {
       const item = document.createElement("li");
       const button = document.createElement("button");

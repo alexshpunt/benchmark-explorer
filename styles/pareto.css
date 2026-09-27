@@ -97,6 +97,29 @@
   background: var(--surface);
 }
 .pareto-side h3 { margin: 0 0 4px; font-size: var(--text-heading); }
+.pareto-nearby {
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.pareto-nearby[hidden] { display: none; }
+#pareto-nearby-list { display: grid; gap: 4px; margin-top: 8px; }
+.pareto-nearby-item {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+.pareto-nearby-item span { display: block; color: var(--muted); font: var(--text-small) var(--mono); }
+.pareto-nearby-item:hover, .pareto-nearby-item:focus-visible {
+  border-color: var(--blue);
+  background: var(--surface-hover);
+}
+.pareto-nearby-item[aria-pressed="true"] { border-color: var(--green); }
 .pareto-side ol { list-style: none; margin: 16px 0 0; padding: 0; border-left: 2px solid var(--green); }
 .pareto-side li { position: relative; margin: 0 0 8px; }
 .pareto-side li::before {

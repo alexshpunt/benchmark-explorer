@@ -41,12 +41,13 @@ test("virtual model price and score give providers one vote, while harness uses 
 test("each combination has independent model and harness score ranges, even across unpriced routes", () => {
   const rows = [row("a", "p1", "h1", 0.5, 1, "1"),
     row("a", "p1", "h2", 0.9, null, "2"),
-    row("b", "p2", "h1", 0.2, 2, "3")];
+    row("b", "p2", "h1", 0.2, 2, "3"),
+    row("a", "p2", "h2", 0.05, 3, "4")];
   const { points } = paretoPoints(rows.map((r) => cell(`${r.modelFamily}\t${r.provider}`, r.harnessFamily, [r])));
   const route = points.find((p) => p.kind === "route" && p.model === "a");
   assert.deepEqual(route.modelRange, { low: 0.5, high: 0.9 });
   assert.deepEqual(route.harnessRange, { low: 0.2, high: 0.5 });
-  assert.equal(points.filter((p) => p.kind === "route").length, 2);
+  assert.equal(points.filter((p) => p.kind === "route").length, 3);
 });
 
 test("frontier excludes dominated and virtual points; equal prices keep the better score", () => {
