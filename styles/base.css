@@ -273,29 +273,11 @@ main {
   border-radius: 999px;
   background: var(--green);
 }
-.status-badge:has(#load-status[data-kind="loading"]) .status-dot {
-  background: var(--amber);
+.status-badge:has(#load-status[data-kind="error"]) .status-dot {
+  background: var(--red);
 }
 #load-status[data-kind="error"] {
   color: var(--red);
-}
-.status-meta {
-  margin: 0 0 0 auto;
-  display: flex;
-  gap: 20px;
-  font-size: var(--text-small);
-}
-.status-meta div {
-  min-width: 0;
-}
-.status-meta dt {
-  color: var(--faint);
-}
-.status-meta dd {
-  margin: 0;
-  color: var(--muted);
-  font-family: var(--mono);
-  font-size: var(--text-small);
 }
 .error-help {
   margin: 0;

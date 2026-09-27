@@ -441,7 +441,6 @@ function renderRecentRuns() {
 async function load() {
   if (typeof DecompressionStream === "undefined")
     throw new Error("This browser does not support gzip streams. Use a current browser.");
-  setStatus("loading", "Loading published Explorer snapshot…");
   setLoader("Loading benchmark results…", 5, "Reading the snapshot manifest");
   const manifestResponse = await fetch("./snapshot-manifest.json", { cache: "no-store" });
   if (!manifestResponse.ok) throw Error(`Snapshot manifest: HTTP ${manifestResponse.status}`);
@@ -468,15 +467,8 @@ async function load() {
   state.trials = snapshot.trials;
   state.rounds = snapshot.rounds;
   state.toolCalls = snapshot.toolCalls;
-  document.querySelector("#revision").textContent = snapshot.revision.slice(0, 10);
-  document.querySelector("#freshness").textContent = "Published snapshot";
-  document.querySelector("#scoring-version").textContent = `v${snapshot.views.scoring.version}`;
-  document.querySelector("#exclusion-policy").textContent =
-    snapshot.views.exclusions?.policyId ?? "none";
-  document.querySelector("#observation-total").textContent = manifest.trials.toLocaleString();
   renderRecentRuns();
   hideLoader();
-  setStatus("ready", `Published scores · ${snapshot.index.runs.length} runs · ${manifest.trials.toLocaleString()} trial records`);
   render();
   const initialCard = new URLSearchParams(location.search).get("card");
   if (initialCard) {
@@ -588,5 +580,6 @@ load().catch((error) => {
   console.error(error);
   hideLoader();
   setStatus("error", `${state.views ? "Run evidence stopped loading; published scores remain available" : "Could not load the public dataset"}. ${error.message}`);
+  document.querySelector(".status-bar").hidden = false;
   document.querySelector("#error-help").hidden = false;
 });

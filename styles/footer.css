@@ -29,11 +29,6 @@ footer p {
     gap: 8px 12px;
     padding-block: 10px;
   }
-  .status-meta {
-    margin: 0;
-    width: 100%;
-    justify-content: space-between;
-  }
   .explorer-toolbar {
     flex-direction: column;
     align-items: stretch;
@@ -60,14 +55,6 @@ footer p {
   }
   .filter-panel {
     width: min(300px, calc(100vw - 24px));
-  }
-  .status-meta {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 8px 12px;
-  }
-  .status-meta dd {
-    overflow-wrap: anywhere;
   }
   footer {
     margin: 20px var(--page-pad) 0;

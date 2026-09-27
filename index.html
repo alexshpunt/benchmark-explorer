@@ -47,14 +47,14 @@
           <p class="editorial-kicker">Explicit Edit / Public benchmark</p>
           <h1 id="explorer-title">What changes when the <em>harness</em> changes?</h1>
           <p class="editorial-description">A public leaderboard comparing how models and harnesses behave on precise text-editing tasks. Explore accepted runs, inspect the evidence, and see where the same model performs differently.</p>
-          <a class="editorial-cta" href="#matrix-title">Explore the results <span aria-hidden="true">↗</span></a>
+          <a class="editorial-count" href="#results-view" aria-label="Browse all published runs">
+            <span class="editorial-count-dot" aria-hidden="true"></span>
+            <strong id="header-run-count">—</strong>
+            <span>Published runs</span>
+            <span class="editorial-count-arrow" aria-hidden="true">↗</span>
+          </a>
         </div>
         <div class="editorial-data">
-          <a class="editorial-count" href="#results-view" aria-label="Browse all published runs">
-            <span class="editorial-overline">Published runs</span>
-            <strong id="header-run-count">—</strong>
-            <span class="editorial-count-link">Browse results <span aria-hidden="true">↗</span></span>
-          </a>
           <section class="editorial-recent" aria-labelledby="recent-runs-title">
             <div class="editorial-recent-heading">
               <h2 id="recent-runs-title">Latest additions</h2>
@@ -64,34 +64,13 @@
           </section>
         </div>
       </header>
-      <section class="status-bar" aria-label="Dataset status">
+      <section class="status-bar" aria-label="Dataset error" hidden>
         <span class="status-badge">
           <span class="status-dot" aria-hidden="true"></span>
           <span id="load-status" role="status" aria-live="polite" data-kind="loading"
             >Preparing to load public data…</span
           >
         </span>
-        <dl class="status-meta">
-          <div>
-            <dt>Revision</dt>
-            <dd id="revision">—</dd>
-          </div>
-          <div>
-            <dt>Fetched</dt>
-            <dd id="freshness">—</dd>
-          </div>
-          <div>
-            <dt>Observations</dt>
-            <dd id="observation-total">—</dd>
-          </div>          <div>
-            <dt>Scoring</dt>
-            <dd id="scoring-version">—</dd>
-          </div>
-          <div>
-            <dt>Exclusions</dt>
-            <dd id="exclusion-policy">—</dd>
-          </div>
-        </dl>
         <p id="error-help" class="error-help" hidden>
           Check your connection or open the
           <a href="https://huggingface.co/datasets/alexshpunt/explicit-edit-benchmark"
