@@ -19,6 +19,7 @@ import { createLeaderboard } from "./modules/leaderboard.mjs";
 import { createDetails } from "./modules/details.mjs";
 import { createComparison } from "./modules/comparison.mjs";
 import { createMatrix } from "./modules/matrix.mjs";
+import { topFiveGroups, renderTopFive } from "./modules/top-five.mjs";
 
 /** Public home of the accepted data, and the base for every provenance link. */
 const DATASET_PAGE = "https://huggingface.co/datasets/alexshpunt/explicit-edit-benchmark";
@@ -101,6 +102,9 @@ const state = {
   filterCategory: /** @type {string | null} */ (null),
   /** Matrix value shown at each model-route and harness intersection. */
   matrixMetric: initialMatrixMetric,
+  topSort: ["score", "cost", "balance"].includes(initialParams.get("topSort"))
+    ? initialParams.get("topSort") : "score",
+  topGroups: null,
   /** Harness families whose individual versions are visible in the matrix. */
   expandedHarnesses: new Set(initialControls.expandedHarnesses),
   matrixGroups: new Set(
@@ -176,6 +180,7 @@ function currentSearch() {
   for (const model of [...state.expandedModels].sort()) params.append("expandModel", model);
   for (const group of [...state.expandedMatrixGroups].sort()) params.append("expandGroup", group);
   for (const selection of state.selected) params.append("select", selection);
+  if (state.topSort !== "score") params.set("topSort", state.topSort);
   if (initialParams.get("testRuns") === "50") params.set("testRuns", "50");
   if (state.card) params.set("card", state.card);
   const theme = new URLSearchParams(location.search).get("__theme");
@@ -299,7 +304,7 @@ function openCard(value) {
 
 function syncUrl(push = false) {
   const search = currentSearch();
-  history[push ? "pushState" : "replaceState"](null, "", search || location.pathname);
+  history[push ? "pushState" : "replaceState"](null, "", (search || location.pathname) + location.hash);
   window.parent.postMessage({ queryString: search }, "https://huggingface.co");
 }
 
@@ -402,6 +407,24 @@ function render() {
   );
 }
 
+function topFiveHref(kind, name) {
+  const search = explorerSearch({}, {
+    filters: { [kind === "models" ? "model" : "harness"]: [name] },
+  });
+  const url = new URL(search, location.href);
+  const metric = new URLSearchParams(location.search).get("metric");
+  if (metric) url.searchParams.set("metric", metric);
+  if (state.topSort !== "score") url.searchParams.set("topSort", state.topSort);
+  const theme = new URLSearchParams(location.search).get("__theme");
+  if (theme) url.searchParams.set("__theme", theme);
+  url.hash = "matrix-title";
+  return url.href;
+}
+
+function updateTopFive() {
+  document.querySelector("#top-five-sort").value = state.topSort;
+  if (state.topGroups) renderTopFive(state.topGroups, state.topSort, topFiveHref);
+}
 function renderRecentRuns() {
   document.querySelector("#header-run-count").textContent = state.index.runs.length.toLocaleString();
   const list = document.querySelector("#recent-runs");
@@ -483,6 +506,8 @@ async function load() {
   state.trials = snapshot.trials;
   state.rounds = snapshot.rounds;
   state.toolCalls = snapshot.toolCalls;
+  state.topGroups = topFiveGroups(snapshot.runRows.all, snapshot.index.runs.map((run) => run.runId));
+  updateTopFive();
   renderRecentRuns();
   hideLoader();
   render();
@@ -492,6 +517,7 @@ async function load() {
     try { openCard(initialCard); } finally { restoringCard = false; }
   }
   syncUrl();
+  if (location.hash === "#matrix-title") document.querySelector("#matrix-title").scrollIntoView();
 }
 
 closeOnOutsideClick(document.querySelector("#cell-details"));
@@ -536,6 +562,9 @@ window.addEventListener("popstate", () => {
   const expandedModels = new Set(params.getAll("expandModel"));
   const expandedMatrixGroups = new Set(params.getAll("expandGroup"));
   const matrixMetric = controls.matrixMetric;
+  const topSort = ["score", "cost", "balance"].includes(params.get("topSort"))
+    ? params.get("topSort") : "score";
+  state.topSort = topSort;
   const matrixMetricChanged = matrixMetric !== state.matrixMetric;
   const expansionChanged = !sameSelection(expandedHarnesses, state.expandedHarnesses) ||
     !sameSelection(matrixGroups, state.matrixGroups) ||
@@ -570,17 +599,24 @@ window.addEventListener("popstate", () => {
   // The card is part of the path too, so Back returns to the previous one.
   restoringCard = true;
   try {
+    updateTopFive();
     openCard(params.get("card"));
   } finally {
     restoringCard = false;
   }
 });
 
+document.querySelector("#top-five-sort").addEventListener("change", (event) => {
+  state.topSort = event.target.value;
+  updateTopFive();
+  syncUrl(true);
+});
 document.querySelector("#matrix-metric").addEventListener("change", (event) => {
   state.matrixMetric = MATRIX_METRIC_IDS.has(event.target.value) ? event.target.value : "score";
   writePreference(MATRIX_METRIC_KEY, state.matrixMetric);
   render();
   syncUrl();
+  updateTopFive();
 });
 
 document.querySelector("#reset-columns").addEventListener("click", () => {

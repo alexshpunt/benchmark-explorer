@@ -14,6 +14,7 @@
     </script>
     <link rel="stylesheet" href="./styles/base.css" />
     <link rel="stylesheet" href="./styles/header.css" />
+    <link rel="stylesheet" href="./styles/top-five.css" />
     <link rel="stylesheet" href="./styles/matrix.css" />
     <link rel="stylesheet" href="./styles/comparison.css" />
     <link rel="stylesheet" href="./styles/leaderboard-controls.css" />
@@ -64,6 +65,35 @@
           </section>
         </div>
       </header>
+      <section class="top-five" aria-labelledby="top-five-title">
+        <div class="top-five-heading">
+          <div>
+            <h2 id="top-five-title">Where the results lead</h2>
+            <p>Full runs only. At least 3 independent routes; price needs every trial measured.</p>
+          </div>
+          <label class="top-five-sort">Rank by
+            <select id="top-five-sort" aria-label="Rank both top-five lists by">
+              <option value="score">Score</option>
+              <option value="cost">Price</option>
+              <option value="balance">Balance</option>
+            </select>
+          </label>
+        </div>
+        <div class="top-five-grid">
+          <section class="top-five-card" aria-labelledby="top-models-title">
+            <h3 id="top-models-title">Top 5 models</h3>
+            <ol id="top-models" class="top-five-list"></ol>
+          </section>
+          <section class="top-five-card" aria-labelledby="top-harnesses-title">
+            <h3 id="top-harnesses-title">Top 5 harnesses</h3>
+            <ol id="top-harnesses" class="top-five-list"></ol>
+          </section>
+        </div>
+        <details class="top-five-guide">
+          <summary>How these rankings work</summary>
+          <p>Only full benchmark runs count. A model needs at least three provider–harness routes; a harness needs at least three model–provider routes. Each route gets one vote. Models are first grouped by provider; harnesses use the newest accepted version on each route. Scores are medians. Price is the median cost of full runs with every trial priced; “—” means no complete price was reported. Score ranking keeps unpriced entries; Price and Balance exclude them. Balance adds the score rank and price rank with equal weight among entries with both. Bars show place in the selected ranking. These lists use the whole published snapshot, not the filters below.</p>
+        </details>
+      </section>
       <section class="status-bar" aria-label="Dataset error" hidden>
         <span class="status-badge">
           <span class="status-dot" aria-hidden="true"></span>
