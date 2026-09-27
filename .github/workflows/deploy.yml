@@ -22,17 +22,24 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
       - run: npm run check
       - run: npm run build:snapshot
+      - name: Install Hugging Face Hub uploader
+        run: python -m pip install --user 'huggingface_hub>=0.35,<2'
       - name: Publish static Space
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
           test -n "$HF_TOKEN"
-          git clone --depth 1 https://oauth2:${HF_TOKEN}@huggingface.co/spaces/alexshpunt/benchmark-explorer .space
-          find .space -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          mkdir -p .space
           cp app.mjs core.mjs index.html styles.css .space/
           cp dist/snapshot.json.gz dist/snapshot-manifest.json .space/
           cp -R vendor .space/vendor
           cp SPACE.md .space/README.md
-          git -C .space add -A
-          git -C .space -c user.name='Aleksandr Shpuntenko' -c user.email='alexshpunt@users.noreply.github.com' commit -m "Deploy ${GITHUB_SHA}" || exit 0
-          git -C .space push origin main
+          python - <<'PY'
+          from huggingface_hub import HfApi
+          HfApi().upload_folder(
+              folder_path=".space",
+              repo_id="alexshpunt/benchmark-explorer",
+              repo_type="space",
+              commit_message="Deploy Explorer snapshot",
+          )
+          PY
