@@ -614,6 +614,23 @@ main {
   white-space: normal;
   overflow-wrap: anywhere;
 }
+.matrix-table tbody th.matrix-model-column {
+  position: sticky;
+}
+.matrix-table tbody th.matrix-model-column:has(.matrix-model-expand) {
+  display: flex;
+  align-items: center;
+}
+.matrix-table tbody th.matrix-model-column:has(.matrix-model-expand) .matrix-header {
+  flex: 1;
+  min-width: 0;
+  width: auto;
+  padding-right: 0;
+}
+.matrix-model-expand {
+  flex: none;
+  margin-right: 25px;
+}
 /*
  * Cells stay neutral: the score is plain text and the scale is carried by a
  * thin bar under the number, so the table never turns into a colour patchwork.
@@ -685,7 +702,7 @@ main {
 .matrix-table tbody .matrix-header {
   justify-content: flex-start;
 }
-.matrix-table th:not(.matrix-model-column):has(.matrix-quick-filter) {
+.matrix-table thead th:not(.matrix-model-column) {
   position: relative;
 }
 .matrix-quick-filter {
@@ -1621,6 +1638,24 @@ main {
   max-width: calc(100vw - 24px);
   padding: 4px;
   overflow-y: auto;
+}
+.matrix-group-options {
+  border-bottom: 1px solid var(--border-strong);
+  margin-bottom: 4px;
+  padding-bottom: 4px;
+}
+.matrix-group-options label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 6px 8px;
+  color: var(--text);
+  font-size: var(--text-body);
+  cursor: pointer;
+}
+.matrix-group-options label:hover {
+  background: var(--surface-hover);
 }
 .filter-categories,
 .filter-submenu {

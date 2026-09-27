@@ -1,3 +1,25 @@
+/** Median of reported values; each provider route can contribute one value. */
+export function median(values) {
+  const sorted = values.filter(Number.isFinite).sort((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length ? (sorted[middle] + sorted[Math.floor((sorted.length - 1) / 2)]) / 2 : null;
+}
+
+/** One median per provider route, then the median of those route values. */
+export function providerMedian(cells, field) {
+  const routes = new Map();
+  for (const cell of cells)
+    routes.set(cell.model, [...(routes.get(cell.model) ?? []), cell[field]]);
+  return median([...routes.values()].map(median));
+}
+/** Match the dataset's DeepSeek modes and Pi extension harness families. */
+export function matrixHarnessGroup(harness) {
+  if (/^dsh-(?:code|standard)$/i.test(harness)) return "DeepSeek";
+  if (/pi-(?:extensions|hashline-edit)/i.test(harness)) return "pi-extensions";
+  if (harness.startsWith("pi-") && !["pi-default", "pi-agent-ide"].includes(harness)) return "pi-extensions";
+  return harness;
+}
+
 const metricNames = ["duration", "cost", "tokens"];
 /** Per-trial sample fields for each observed metric. */
 const SAMPLE_FIELDS = { duration: "seconds", cost: "costUsd", tokens: "tokens" };

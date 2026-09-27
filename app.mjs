@@ -7,6 +7,8 @@ import {
   compareHarnessVersions,
   modelRouteIdentity,
   modelRouteLabel,
+  providerMedian,
+  matrixHarnessGroup,
   moveColumn,
   normalizeColumnLayout,
   observedMetricAverage,
@@ -156,6 +158,11 @@ const state = {
   matrixMetric: initialMatrixMetric,
   /** Harness families whose individual versions are visible in the matrix. */
   expandedHarnesses: new Set(initialControls.expandedHarnesses),
+  matrixGroups: new Set(
+    ["model", "harness", "extension"].filter((value) => !initialParams.getAll("ungroup").includes(value)),
+  ),
+  expandedModels: new Set(initialParams.getAll("expandModel")),
+  expandedMatrixGroups: new Set(initialParams.getAll("expandGroup")),
   /** Browser-persisted leaderboard column visibility and order. */
   columnLayout: null,
   /** Card currently open in the dialog, mirrored into the URL. @type {string | null} */
@@ -229,6 +236,10 @@ function currentSearch() {
     },
   );
   const params = new URLSearchParams(search);
+  for (const group of ["model", "harness", "extension"])
+    if (!state.matrixGroups.has(group)) params.append("ungroup", group);
+  for (const model of [...state.expandedModels].sort()) params.append("expandModel", model);
+  for (const group of [...state.expandedMatrixGroups].sort()) params.append("expandGroup", group);
   for (const selection of state.selected) params.append("select", selection);
   if (state.card) params.set("card", state.card);
   const theme = new URLSearchParams(location.search).get("__theme");
@@ -581,6 +592,59 @@ function matrixExpansionButton(harness) {
   button.addEventListener("click", () => toggleHarnessExpansion(harness));
   return button;
 }
+/** Build collapsed columns and model rows from the route-level matrix cells. */
+function groupedMatrixCells(cells) {
+  const models = state.matrixGroups.has("model");
+  const harnesses = state.matrixGroups.has("harness");
+  const extensions = state.matrixGroups.has("extension");
+  const groups = new Map();
+  const add = (cell) => groups.set(JSON.stringify([cell.model, cell.columnKey]), cell);
+  for (const cell of cells) add(cell);
+  const columnGroups = new Map();
+  for (const cell of cells) {
+    if (cell.overall) continue;
+    const label = matrixHarnessGroup(cell.harness);
+    if ((label === "DeepSeek" && harnesses) || (label === "pi-extensions" && extensions)) {
+      const key = JSON.stringify([cell.model, label]);
+      columnGroups.set(key, [...(columnGroups.get(key) ?? []), cell]);
+    }
+  }
+  const collapse = (members, model, columnKey, harness) => {
+    const first = members[0];
+    const fields = ["score", "firstExactRate", "finalExactRate", "recoveryGain", "duration", "averageCost", "averageTokens", "qualityPerDollar"];
+    const values = Object.fromEntries(fields.map((field) => [field, providerMedian(members, field)]));
+    return { ...first, ...values, key: "group:" + JSON.stringify([model, columnKey]), model,
+      columnKey, harness, label: harness === OVERALL ? "Overall" : harness,
+      compact: first.compact, grouped: true, sourceRows: [...new Set(members.flatMap(rowsForCell))],
+      observations: members.reduce((sum, cell) => sum + cell.observations, 0),
+      costObservations: members.reduce((sum, cell) => sum + cell.costObservations, 0),
+      tokenObservations: members.reduce((sum, cell) => sum + cell.tokenObservations, 0) };
+  };
+  for (const [key, members] of columnGroups) {
+    const [model, label] = JSON.parse(key);
+    add(collapse(members, model, label, label));
+  }
+  if (models) {
+    const familyGroups = new Map();
+    for (const cell of groups.values()) {
+      const family = cell.model.split("\t")[0];
+      const key = JSON.stringify([family, cell.columnKey]);
+      familyGroups.set(key, [...(familyGroups.get(key) ?? []), cell]);
+    }
+    for (const [key, members] of familyGroups) {
+      const [family, columnKey] = JSON.parse(key);
+      add(collapse(members, family, columnKey, members[0].harness));
+    }
+  }
+  return [...groups.values()].filter((cell) => {
+    if (models && cell.model.includes("\t") && !state.expandedModels.has(cell.model.split("\t")[0])) return false;
+    const group = matrixHarnessGroup(cell.harness);
+    if (cell.columnKey !== group && ((group === "DeepSeek" && harnesses) ||
+      (group === "pi-extensions" && extensions)) && !state.expandedMatrixGroups.has(group)) return false;
+    return true;
+  });
+}
+
 function renderMatrix(cells) {
   const root = document.querySelector("#matrix-view");
   root.replaceChildren();
@@ -589,10 +653,14 @@ function renderMatrix(cells) {
   const overallScore = new Map(
     cells.filter((cell) => cell.overall).map((cell) => [cell.model, cell.score ?? 0]),
   );
-  const models = [...new Set(cells.map((cell) => cell.model))].sort(
-    (left, right) =>
-      (overallScore.get(right) ?? 0) - (overallScore.get(left) ?? 0) || left.localeCompare(right),
-  );
+  const models = [...new Set(cells.map((cell) => cell.model))].sort((left, right) => {
+    const leftFamily = left.split("\t")[0];
+    const rightFamily = right.split("\t")[0];
+    if (state.matrixGroups.has("model") && leftFamily === rightFamily)
+      return Number(left.includes("\t")) - Number(right.includes("\t")) || left.localeCompare(right);
+    return (overallScore.get(rightFamily) ?? overallScore.get(right) ?? 0) -
+      (overallScore.get(leftFamily) ?? overallScore.get(left) ?? 0) || left.localeCompare(right);
+  });
   const overall = cells.find((cell) => cell.overall);
   const harnessScores = new Map();
   for (const row of state.configurations) {
@@ -615,19 +683,18 @@ function renderMatrix(cells) {
   for (const cell of cells.filter((candidate) => !candidate.overall)) {
     byHarness.set(cell.harness, [...(byHarness.get(cell.harness) ?? []), cell]);
   }
-  const harnessOrder = [...byHarness.keys()].sort(
-    (left, right) =>
-      (rankByHarness.get(right) ?? 0) - (rankByHarness.get(left) ?? 0) ||
-      left.localeCompare(right),
-  );
+  const harnessOrder = [...byHarness.keys()].sort((left, right) => {
+    const a = matrixHarnessGroup(left);
+    const b = matrixHarnessGroup(right);
+    if (a === b) return left === a ? -1 : right === b ? 1 : left.localeCompare(right);
+    return (rankByHarness.get(b) ?? 0) - (rankByHarness.get(a) ?? 0) || a.localeCompare(b);
+  });
   const harnesses = harnessOrder.flatMap((harness) => {
     const unique = [
       ...new Map(byHarness.get(harness).map((cell) => [cell.columnKey, cell])).values(),
     ];
     return state.expandedHarnesses.has(harness)
-      ? unique.sort((left, right) =>
-          compareHarnessVersions(left.version ?? "", right.version ?? ""),
-        )
+      ? unique.sort((left, right) => compareHarnessVersions(left.version ?? "", right.version ?? ""))
       : unique.slice(0, 1);
   });
   const series = overall ? [overall, ...harnesses] : harnesses;
@@ -660,32 +727,48 @@ function renderMatrix(cells) {
     }
     const expanded = state.expandedHarnesses.has(seriesCell.harness);
     th.classList.toggle("matrix-expanded-head", expanded);
-    th.title = seriesCell.compact
-      ? `${seriesCell.harness}\nEach model uses its latest available version and accepted run`
-      : seriesCell.label;
+    th.title = ["DeepSeek", "pi-extensions"].includes(seriesCell.harness)
+      ? `${seriesCell.harness}\nMedian across the group's harnesses per provider route`
+      : seriesCell.compact
+        ? `${seriesCell.harness}\nEach model uses its latest available version and accepted run`
+        : seriesCell.label;
     const columnButton = document.createElement("button");
     columnButton.type = "button";
     columnButton.className = "matrix-header";
     const columnLabel = document.createElement("span");
     columnLabel.className = "matrix-header-label";
-    columnLabel.textContent = expanded
-      ? `${seriesCell.harness} ${seriesCell.version ?? "unknown"}`
-      : seriesCell.harness;
+    columnLabel.textContent = seriesCell.harness === "dsh-code" ? "DeepSeek codemode" :
+      seriesCell.harness === "dsh-standard" ? "DeepSeek standard" :
+      expanded ? `${seriesCell.harness} ${seriesCell.version ?? "unknown"}` : seriesCell.harness;
     columnButton.append(columnLabel);
     const detailsVersion = seriesCell.compact ? null : seriesCell.version;
     columnButton.title = `Open ${seriesCell.compact ? seriesCell.harness : seriesCell.label}`;
-    columnButton.addEventListener("click", () =>
-      openHarnessDetails(seriesCell.harness, detailsVersion),
-    );
+    if (!seriesCell.grouped || !["DeepSeek", "pi-extensions"].includes(seriesCell.harness))
+      columnButton.addEventListener("click", () => openHarnessDetails(seriesCell.harness, detailsVersion));
     th.append(columnButton);
     const actions = document.createElement("span");
     actions.className = "matrix-header-actions";
-    actions.append(matrixExpansionButton(seriesCell.harness));
+    if (seriesCell.grouped && ["DeepSeek", "pi-extensions"].includes(seriesCell.harness)) {
+      const toggle = document.createElement("button");
+      toggle.type = "button";
+      toggle.className = "matrix-expand-toggle";
+      const expandedGroup = state.expandedMatrixGroups.has(seriesCell.harness);
+      toggle.textContent = expandedGroup ? "‹" : "›";
+      toggle.setAttribute("aria-expanded", String(expandedGroup));
+      toggle.setAttribute("aria-label", (expandedGroup ? "Collapse " : "Expand ") + seriesCell.harness + " harnesses");
+      toggle.addEventListener("click", () => {
+        if (expandedGroup) state.expandedMatrixGroups.delete(seriesCell.harness);
+        else state.expandedMatrixGroups.add(seriesCell.harness);
+        renderMatrixState(matrixCells(state.configurations, state.compactConfigurations, state.expandedHarnesses));
+        syncUrl(true);
+      });
+      actions.append(toggle);
+    } else actions.append(matrixExpansionButton(seriesCell.harness));
     const filterName = seriesCell.compact ? "harness" : "harnessVersion";
     const filterValue = seriesCell.compact
       ? seriesCell.harness
       : seriesCell.harness + "\t" + seriesCell.version;
-    actions.append(
+    if (!seriesCell.grouped || !["DeepSeek", "pi-extensions"].includes(seriesCell.harness)) actions.append(
       matrixFilterButton(
         filterName,
         filterValue,
@@ -703,7 +786,7 @@ function renderMatrix(cells) {
     heading.className = "matrix-model-column";
     heading.scope = "row";
     const [modelFamily, provider] = model.split("\t");
-    const modelLabel = `${modelFamily} · ${provider}`;
+    const modelLabel = provider ? `${modelFamily} · ${provider}` : modelFamily;
     heading.title = `Open ${modelLabel}`;
     const rowButton = document.createElement("button");
     rowButton.type = "button";
@@ -712,10 +795,26 @@ function renderMatrix(cells) {
     rowLabel.className = "matrix-header-label";
     rowLabel.textContent = modelLabel;
     rowButton.append(rowLabel);
-    rowButton.addEventListener("click", () => openModelDetails(model));
+    rowButton.addEventListener("click", () => provider && openModelDetails(model));
     heading.append(rowButton);
+    if (state.matrixGroups.has("model") && !provider) {
+      const toggle = document.createElement("button");
+      toggle.type = "button";
+      toggle.className = "matrix-expand-toggle matrix-model-expand";
+      const expanded = state.expandedModels.has(modelFamily);
+      toggle.textContent = expanded ? "⌄" : "›";
+      toggle.setAttribute("aria-expanded", String(expanded));
+      toggle.setAttribute("aria-label", (expanded ? "Collapse " : "Expand ") + modelFamily + " providers");
+      toggle.addEventListener("click", () => {
+        if (expanded) state.expandedModels.delete(modelFamily);
+        else state.expandedModels.add(modelFamily);
+        renderMatrixState(matrixCells(state.configurations, state.compactConfigurations, state.expandedHarnesses));
+        syncUrl(true);
+      });
+      heading.append(toggle);
+    }
     heading.append(matrixFilterButton("model", modelFamily, modelFamily));
-    heading.append(matrixFilterButton("provider", provider, provider));
+    if (provider) heading.append(matrixFilterButton("provider", provider, provider));
     row.append(heading);
     for (const seriesCell of series) {
       const td = document.createElement("td");
@@ -2849,13 +2948,17 @@ function renderActiveFilters() {
 }
 function renderMatrixState(cells) {
   for (const cell of cells) state.matrixCellCache.set(cell.key, cell);
-  const modelRoutes = cells.filter((cell) => cell.overall).length;
+  const modelRoutes = state.matrixGroups.has("model")
+    ? new Set(cells.filter((cell) => cell.overall).map((cell) => cell.model.split("\t")[0])).size
+    : cells.filter((cell) => cell.overall).length;
   const harnessColumns = new Set(
     cells.filter((cell) => !cell.overall).map((cell) => cell.columnKey),
   ).size;
   document.querySelector("#summary-context").textContent =
-    `${modelRoutes} model routes · ${harnessColumns} harness columns`;
-  renderMatrix(cells);
+    `${modelRoutes} ${state.matrixGroups.has("model") ? "model families" : "model routes"} · ${harnessColumns} harness columns`;
+  const visible = groupedMatrixCells(cells);
+  for (const cell of visible) state.matrixCellCache.set(cell.key, cell);
+  renderMatrix(visible);
   renderComparison(cells);
 }
 function render() {
@@ -3073,6 +3176,23 @@ function buildFilterMenus(rows) {
     }
     panel.append(categoryMenu);
   }
+  const grouping = document.createElement("div");
+  grouping.className = "matrix-group-options";
+  for (const [value, label] of [["model", "Group models by family"], ["harness", "Group DeepSeek harnesses"], ["extension", "Group pi-extensions"]]) {
+    const option = document.createElement("label");
+    const check = document.createElement("input");
+    check.type = "checkbox";
+    check.checked = state.matrixGroups.has(value);
+    check.addEventListener("change", () => {
+      if (check.checked) state.matrixGroups.add(value);
+      else state.matrixGroups.delete(value);
+      renderMatrixState(matrixCells(state.configurations, state.compactConfigurations, state.expandedHarnesses));
+      syncUrl(true);
+    });
+    option.append(check, document.createTextNode(label));
+    grouping.append(option);
+  }
+  panel.prepend(grouping);
   repositionFilterPopover();
 }
 async function load() {
@@ -3429,9 +3549,15 @@ window.addEventListener("popstate", () => {
   );
   const selected = new Set(params.getAll("select"));
   const expandedHarnesses = new Set(controls.expandedHarnesses);
+  const matrixGroups = new Set(["model", "harness", "extension"].filter((value) => !params.getAll("ungroup").includes(value)));
+  const expandedModels = new Set(params.getAll("expandModel"));
+  const expandedMatrixGroups = new Set(params.getAll("expandGroup"));
   const matrixMetric = controls.matrixMetric;
   const matrixMetricChanged = matrixMetric !== state.matrixMetric;
-  const expansionChanged = !sameSelection(expandedHarnesses, state.expandedHarnesses);
+  const expansionChanged = !sameSelection(expandedHarnesses, state.expandedHarnesses) ||
+    !sameSelection(matrixGroups, state.matrixGroups) ||
+    !sameSelection(expandedModels, state.expandedModels) ||
+    !sameSelection(expandedMatrixGroups, state.expandedMatrixGroups);
   // Back and forward usually move only the card or harness expansion. Rebuild
   // all views only when data-bearing controls changed; expansion redraws just
   // the matrix and its comparison panel.
@@ -3444,12 +3570,19 @@ window.addEventListener("popstate", () => {
     state.selected = selected;
     state.matrixMetric = matrixMetric;
     state.expandedHarnesses = expandedHarnesses;
+    state.matrixGroups = matrixGroups;
+    state.expandedModels = expandedModels;
+    state.expandedMatrixGroups = expandedMatrixGroups;
     render();
   } else if (expansionChanged) {
     state.expandedHarnesses = expandedHarnesses;
+    state.matrixGroups = matrixGroups;
+    state.expandedModels = expandedModels;
+    state.expandedMatrixGroups = expandedMatrixGroups;
     renderMatrixState(
       matrixCells(state.configurations, state.compactConfigurations, state.expandedHarnesses),
     );
+    buildFilterMenus(state.allRows);
   }
   // The card is part of the path too, so Back returns to the previous one.
   restoringCard = true;
