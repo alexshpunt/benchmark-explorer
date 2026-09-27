@@ -761,7 +761,7 @@ function renderMatrix(cells) {
     th.title = ["DeepSeek", "pi-extensions"].includes(seriesCell.harness)
       ? `${seriesCell.harness}\nMedian across the group's harnesses per provider route`
       : seriesCell.compact
-        ? `${seriesCell.harness}\nEach model uses its latest available version and accepted run`
+        ? `${seriesCell.harness}\nMedian score across available versions for each model route`
         : seriesCell.label;
     const columnButton = document.createElement("button");
     columnButton.type = "button";
