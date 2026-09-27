@@ -12,11 +12,11 @@
       const theme = new URLSearchParams(window.location.search).get("__theme");
       if (theme === "light" || theme === "dark") document.documentElement.dataset.theme = theme;
     </script>
-    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./styles.css?v=model-chevron-2" />
     <script type="module" src="./app.mjs"></script>
   </head>
   <body>
-    <!-- Loading screen: the partial UI stays hidden until the shards are in. -->
+    <!-- Loading screen: the partial UI stays hidden until the snapshot is ready. -->
     <div id="loader" class="loader" role="status" aria-live="polite">
       <div class="loader-ring" aria-hidden="true"></div>
       <p id="loader-text" class="loader-text">Loading benchmark results…</p>
