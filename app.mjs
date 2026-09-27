@@ -19,6 +19,7 @@ import { createLeaderboard } from "./modules/leaderboard.mjs";
 import { createDetails } from "./modules/details.mjs";
 import { createComparison } from "./modules/comparison.mjs";
 import { createMatrix } from "./modules/matrix.mjs";
+import { createPareto } from "./modules/pareto.mjs";
 import { topFiveGroups, renderTopFive } from "./modules/top-five.mjs";
 
 /** Public home of the accepted data, and the base for every provenance link. */
@@ -93,6 +94,7 @@ const state = {
   allRows: [],
   /** Latest accepted run rows used by compact matrix columns. */
   compactConfigurations: [],
+  paretoCells: [],
   /** Matrix cells retained by key so a hidden compact selection keeps its meaning. */
   matrixCellCache: new Map(),
   /** Numeric range filters. They narrow the table only, not the whole page. */
@@ -312,7 +314,7 @@ function mean(values) {
   return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
 }
 
-const { matrixCells, groupedMatrixCells, renderMatrix, rowsForCell, cellKeyFromRow } = createMatrix(state, {
+const { matrixCells, groupedMatrixCells, renderMatrix, rowsForCell, cellKeyFromRow, toggleSelection } = createMatrix(state, {
   mean, OVERALL, COLORS, selectedValues, syncUrl, render, renderMatrixState,
   openModelDetails: (...args) => openModelDetails(...args),
   openHarnessDetails: (...args) => openHarnessDetails(...args),
@@ -323,6 +325,7 @@ function percentText(value) {
   return value == null ? "—" : `${(value * 100).toFixed(1)}%`;
 }
 
+const pareto = createPareto(state, toggleSelection);
 const { COLUMN_BY_ID, DEFAULT_COLUMN_IDS, REQUIRED_COLUMN_IDS, saveColumnLayout,
   clearColumnDropIndicators, showColumnDropIndicator, moveLeaderboardColumn, applyLeaderboardColumnLayout,
   renderColumnSettings, renderResultsTable, addOverflowTitles } = createLeaderboard(state, {
@@ -389,15 +392,12 @@ function render() {
   state.configurations = configurationRows.toSorted((left, right) =>
     Number(right.fullBenchmark) - Number(left.fullBenchmark) || right.score - left.score);
   state.compactConfigurations = compactRows;
-  state.matrixCellCache = new Map(
-    matrixCells(state.configurations, state.compactConfigurations, new Set()).map((cell) => [
-      cell.key,
-      cell,
-    ]),
-  );
-  renderMatrixState(
-    matrixCells(state.configurations, state.compactConfigurations, state.expandedHarnesses),
-  );
+  state.paretoCells = matrixCells(state.configurations, state.compactConfigurations, new Set());
+  state.matrixCellCache = new Map(state.paretoCells.map((cell) => [cell.key, cell]));
+  const cells = matrixCells(state.configurations, state.compactConfigurations, state.expandedHarnesses);
+  renderMatrixState(cells);
+  pareto.render(state.paretoCells);
+  renderComparison(cells);
   renderResultsTable(configurationRows.filter(matchesRanges));
   renderRangeFilters();
   buildFilterMenus(state.allRows);

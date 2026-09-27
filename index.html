@@ -15,6 +15,7 @@
     <link rel="stylesheet" href="./styles/base.css" />
     <link rel="stylesheet" href="./styles/header.css" />
     <link rel="stylesheet" href="./styles/top-five.css" />
+    <link rel="stylesheet" href="./styles/pareto.css" />
     <link rel="stylesheet" href="./styles/matrix.css" />
     <link rel="stylesheet" href="./styles/comparison.css" />
     <link rel="stylesheet" href="./styles/leaderboard-controls.css" />
@@ -139,6 +140,27 @@
         </div>
       </section>
 
+      <section class="pareto-panel" aria-labelledby="pareto-title">
+        <div class="pareto-heading">
+          <div>
+            <h2 id="pareto-title">Price × score frontier</h2>
+            <p id="pareto-context"></p>
+          </div>
+          <p>Squares: model routes × harnesses. Blue outlines: model medians; amber: harness medians.</p>
+        </div>
+        <div class="pareto-layout">
+          <div class="pareto-chart-wrap">
+            <div id="pareto-chart" role="region" aria-label="Price and score chart"></div>
+            <div id="pareto-tip" class="pareto-tip" hidden></div>
+          </div>
+          <aside class="pareto-side" aria-labelledby="pareto-list-title">
+            <h3 id="pareto-list-title">On the frontier</h3>
+            <p>Cheaper runs with the highest score at each price.</p>
+            <ol id="pareto-list"></ol>
+          </aside>
+        </div>
+        <p class="pareto-note">Only complete runs with a fully measured price are plotted. The line joins real, non-dominated combinations; model and harness medians do not change it. Whiskers show the lowest and highest score behind each point. Click a square or list entry to compare up to four; filters also apply here.</p>
+      </section>
       <section class="summary-row" aria-label="Model route and harness matrix">
         <section class="panel matrix-panel">
           <div class="panel-heading">
@@ -163,10 +185,10 @@
               Rows are model routes and columns are harnesses. A compact harness column uses each
               model's latest available version and accepted run; hover a value to see that source.
               Use the arrow beside a harness to compare its versions side by side. The Overall column
-              pools harnesses for each model; the Overall row is the median across model families for
-              each harness, with providers sharing one model vote. A dash means the metric was not
-              reported. Select a value to compare configurations, or select a row or column label to
-              open details.
+              pools harnesses for each model; Across all models gives the median by model family for
+              each harness, with providers sharing one model vote. The two summaries have no shared
+              score. A dash means the metric was not reported. Select a value to compare
+              configurations, or select a row or column label to open details.
             </p>
           </details>
           <div

@@ -452,7 +452,7 @@ export function createMatrix(state, {
     const { low, high } = metricValues.length ? rampBounds(metricValues) : { low: 0, high: 0 };
     const table = document.createElement("table");
     table.className = "matrix-table";
-    table.style.width = `${180 + series.length * 78}px`;
+    table.style.minWidth = `${10 + series.length * 8}rem`;
     const head = document.createElement("thead");
     const headRow = document.createElement("tr");
     const modelHead = document.createElement("th");
@@ -570,10 +570,17 @@ export function createMatrix(state, {
     const summaryLabel = document.createElement("th");
     summaryLabel.scope = "row";
     summaryLabel.className = "matrix-model-column";
-    summaryLabel.textContent = "Overall";
-    summaryLabel.title = "Median across all visible model families";
+    summaryLabel.textContent = "Across all models";
+    summaryLabel.title = "Median across model families, with one vote per model";
     summaryRow.append(summaryLabel);
     for (const column of series) {
+      if (column.overall) {
+        const corner = document.createElement("td");
+        corner.className = "matrix-corner";
+        corner.title = "No score: both axes are aggregated";
+        summaryRow.append(corner);
+        continue;
+      }
       const summary = matrixAcrossModels(cells, column, rowsForCell);
       if (summary) state.matrixCellCache.set(summary.key, summary);
       summaryRow.append(renderValue(summary, "Across all models"));
@@ -622,8 +629,11 @@ export function createMatrix(state, {
       if (provider) rowActions.append(matrixFilterButton("provider", provider, provider));
       heading.append(rowActions);
       row.append(heading);
-      for (const seriesCell of series)
-        row.append(renderValue(byPosition.get(`${model}\0${seriesCell.columnKey}`), modelLabel));
+      for (const seriesCell of series) {
+        const td = renderValue(byPosition.get(`${model}\0${seriesCell.columnKey}`), modelLabel);
+        if (seriesCell.overall) td.classList.add("matrix-overall-column");
+        row.append(td);
+      }
       body.append(row);
     }
     table.append(head, body);
@@ -654,5 +664,5 @@ export function createMatrix(state, {
     ramp.title = `${metric.label}: lower visible values are ${lowMeaning}, higher values are ${highMeaning}`;
   }
 
-  return { matrixCells, groupedMatrixCells, renderMatrix, rowsForCell, cellKeyFromRow };
+  return { matrixCells, groupedMatrixCells, renderMatrix, rowsForCell, cellKeyFromRow, toggleSelection };
 }

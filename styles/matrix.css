@@ -21,9 +21,7 @@
   box-shadow: inset -12px 0 10px -12px rgb(0 0 0 / 45%);
 }
 .matrix-table {
-  --matrix-cell-size: 78px;
-  --matrix-model-width: 180px;
-  width: max-content;
+  width: 100%;
   border-collapse: collapse;
   table-layout: fixed;
   font-size: var(--text-body);
@@ -57,13 +55,15 @@
 }
 /* The overall column summarises a model across harnesses. */
 .matrix-overall-head {
+  width: 6rem;
+  padding-inline: var(--pad-cell) !important;
   color: var(--text);
 }
 .matrix-model-column {
   position: sticky;
   left: 0;
   z-index: 2;
-  width: var(--matrix-model-width);
+  width: 10rem;
 }
 /* A continuous left stripe ties the model summary to its provider rows. */
 .matrix-table tbody .matrix-expanded-model::before {
@@ -95,7 +95,7 @@
   box-shadow: 5px 0 8px rgb(0 0 0 / 28%);
 }
 .matrix-table tbody th {
-  width: var(--matrix-model-width);
+  width: 10rem;
   padding: 0;
   background: var(--surface);
   color: var(--text);
@@ -109,33 +109,24 @@
 .matrix-table tbody th.matrix-model-column .matrix-header {
   padding-right: 58px;
 }
-/* Only values are square; model names have a wider sticky label column. */
-.matrix-table tbody tr {
-  height: var(--matrix-cell-size);
-}
-.matrix-table tbody td {
-  width: var(--matrix-cell-size);
-  height: var(--matrix-cell-size);
-  overflow: hidden;
-}
-.matrix-table tbody .matrix-header {
-  max-height: var(--matrix-cell-size);
-  overflow: hidden;
-}
-.matrix-table tbody .matrix-header-label {
-  max-height: var(--matrix-cell-size);
-  overflow: hidden;
-}
-.matrix-table tbody .matrix-cell {
-  font-size: 12px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.matrix-table tbody .matrix-across-models {
+  height: calc(var(--row-height) + 12px);
 }
 .matrix-table tbody .matrix-across-models > * {
   background: var(--surface-muted, var(--surface));
   border-bottom: 2px solid var(--border-strong);
   font-weight: 600;
+}
+.matrix-table thead .matrix-overall-head,
+.matrix-table tbody .matrix-overall-column {
+  background: var(--surface-muted);
+}
+.matrix-table thead .matrix-overall-head,
+.matrix-table tbody .matrix-across-models .matrix-model-column {
+  color: var(--blue);
+}
+.matrix-table tbody .matrix-across-models > .matrix-corner {
+  background: var(--surface);
 }
 /*
  * Cells stay neutral: the score is plain text and the scale is carried by a
@@ -227,38 +218,8 @@
   cursor: pointer;
   transform: translateY(-50%);
 }
-/* Rotated headers keep every score column the same narrow width. */
-.matrix-table thead th:not(.matrix-model-column) {
-  width: var(--matrix-cell-size);
-  height: 245px;
-  vertical-align: bottom;
-  overflow-wrap: normal;
-}
 .matrix-table thead .matrix-header {
-  height: 245px;
-  min-height: 0;
-  justify-content: center;
-  align-items: flex-end;
-  padding: 8px 0 34px;
-}
-.matrix-table thead .matrix-header-label {
-  writing-mode: vertical-rl;
-  transform: rotate(180deg);
-  white-space: nowrap;
-  overflow-wrap: normal;
-  max-height: 200px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  padding: 0;
-}
-.matrix-table thead .matrix-overall-head .matrix-header-label {
-  margin: 0 auto 34px;
-}
-.matrix-table thead .matrix-header-actions {
-  top: auto;
-  bottom: 5px;
-  right: 50%;
-  transform: translateX(50%);
+  padding-right: 58px;
 }
 .matrix-header-actions {
   position: absolute;
