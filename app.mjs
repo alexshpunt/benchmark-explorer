@@ -25,6 +25,7 @@ import {
   relativeQualityPosition,
   precomputedFamilyScore,
   resolveHarnessVersion,
+  runBatches,
   taskFamily,
   toolTrialCounts,
   setViewsData,
@@ -190,14 +191,14 @@ function hideLoader() {
   document.querySelector("#loader").hidden = true;
 }
 
-async function fetchGzipJsonLines(root, file, label, progress) {
+async function fetchGzipJsonLines(root, file, label) {
   const response = await fetch(new URL(file.path, root), { cache: "no-store" });
   if (!response.ok) throw new Error(`${label}: HTTP ${response.status}`);
   const compressed = await response.arrayBuffer();
   await verifyPublishedBytes(compressed, file.sha256);
   const stream = new Blob([compressed]).stream().pipeThrough(new DecompressionStream("gzip"));
-  progress();
-  return parseJsonLines(await new Response(stream).text());
+  const rows = parseJsonLines(await new Response(stream).text());
+  return rows;
 }
 
 function filtersFromRoute(route) {
@@ -241,6 +242,7 @@ function currentSearch() {
   for (const model of [...state.expandedModels].sort()) params.append("expandModel", model);
   for (const group of [...state.expandedMatrixGroups].sort()) params.append("expandGroup", group);
   for (const selection of state.selected) params.append("select", selection);
+  if (initialParams.get("testRuns") === "50") params.set("testRuns", "50");
   if (state.card) params.set("card", state.card);
   const theme = new URLSearchParams(location.search).get("__theme");
   if (theme) params.set("__theme", theme);
@@ -566,6 +568,26 @@ function matrixFilterButton(name, value, label) {
   return button;
 }
 
+function matrixGroupFilterButton(group) {
+  const harnesses = new Set(state.configurations
+    .map((row) => row.harnessFamily)
+    .filter((harness) => matrixHarnessGroup(harness) === group));
+  const selected = selectedValues("harness");
+  const active = selected.size === harnesses.size && [...harnesses].every((value) => selected.has(value));
+  const button = matrixFilterButton("harness", group, group).cloneNode(true);
+  button.classList.toggle("active", active);
+  button.setAttribute("aria-pressed", String(active));
+  button.setAttribute("aria-label", `${active ? "Clear" : "Filter to"} ${group} harnesses`);
+  button.title = button.getAttribute("aria-label");
+  button.addEventListener("click", () => {
+    selected.clear();
+    if (!active) for (const harness of harnesses) selected.add(harness);
+    state.selected.clear();
+    render();
+    syncUrl();
+  });
+  return button;
+}
 function toggleHarnessExpansion(harness) {
   if (state.expandedHarnesses.has(harness)) state.expandedHarnesses.delete(harness);
   else state.expandedHarnesses.add(harness);
@@ -762,7 +784,7 @@ function renderMatrix(cells) {
         renderMatrixState(matrixCells(state.configurations, state.compactConfigurations, state.expandedHarnesses));
         syncUrl(true);
       });
-      actions.append(toggle);
+      actions.append(toggle, matrixGroupFilterButton(seriesCell.harness));
     } else actions.append(matrixExpansionButton(seriesCell.harness));
     const filterName = seriesCell.compact ? "harness" : "harnessVersion";
     const filterValue = seriesCell.compact
@@ -797,10 +819,12 @@ function renderMatrix(cells) {
     rowButton.append(rowLabel);
     rowButton.addEventListener("click", () => provider && openModelDetails(model));
     heading.append(rowButton);
+    const rowActions = document.createElement("span");
+    rowActions.className = "matrix-header-actions";
     if (state.matrixGroups.has("model") && !provider) {
       const toggle = document.createElement("button");
       toggle.type = "button";
-      toggle.className = "matrix-expand-toggle matrix-model-expand";
+      toggle.className = "matrix-expand-toggle";
       const expanded = state.expandedModels.has(modelFamily);
       toggle.textContent = expanded ? "⌄" : "›";
       toggle.setAttribute("aria-expanded", String(expanded));
@@ -811,10 +835,11 @@ function renderMatrix(cells) {
         renderMatrixState(matrixCells(state.configurations, state.compactConfigurations, state.expandedHarnesses));
         syncUrl(true);
       });
-      heading.append(toggle);
+      rowActions.append(toggle);
     }
-    heading.append(matrixFilterButton("model", modelFamily, modelFamily));
-    if (provider) heading.append(matrixFilterButton("provider", provider, provider));
+    rowActions.append(matrixFilterButton("model", modelFamily, modelFamily));
+    if (provider) rowActions.append(matrixFilterButton("provider", provider, provider));
+    heading.append(rowActions);
     row.append(heading);
     for (const seriesCell of series) {
       const td = document.createElement("td");
@@ -2948,15 +2973,15 @@ function renderActiveFilters() {
 }
 function renderMatrixState(cells) {
   for (const cell of cells) state.matrixCellCache.set(cell.key, cell);
-  const modelRoutes = state.matrixGroups.has("model")
-    ? new Set(cells.filter((cell) => cell.overall).map((cell) => cell.model.split("\t")[0])).size
-    : cells.filter((cell) => cell.overall).length;
+  const visible = groupedMatrixCells(cells);
+  const modelRoutes = new Set(visible.map((cell) =>
+    state.matrixGroups.has("model") ? cell.model.split("\t")[0] : cell.model,
+  )).size;
   const harnessColumns = new Set(
-    cells.filter((cell) => !cell.overall).map((cell) => cell.columnKey),
+    visible.filter((cell) => !cell.overall).map((cell) => cell.columnKey),
   ).size;
   document.querySelector("#summary-context").textContent =
     `${modelRoutes} ${state.matrixGroups.has("model") ? "model families" : "model routes"} · ${harnessColumns} harness columns`;
-  const visible = groupedMatrixCells(cells);
   for (const cell of visible) state.matrixCellCache.set(cell.key, cell);
   renderMatrix(visible);
   renderComparison(cells);
@@ -3216,55 +3241,43 @@ async function load() {
   const viewsData = JSON.parse(new TextDecoder().decode(viewsBytes));
   validateDatasetSnapshot(index, viewsData);
   setViewsData(viewsData);
-  const jobs = index.runs.flatMap((run) =>
-    ["profiles", "trials", "rounds", "tool-calls"].map((table) => ({
-      table,
-      runId: run.runId,
-      file: run.files[table],
-    })),
-  );
-  setLoader("Loading benchmark results…", 10, `0 of ${jobs.length} result shards`);
-  let loaded = 0;
-  const groups = await Promise.all(
-    jobs.map((job) =>
-      fetchGzipJsonLines(root, job.file, `${job.runId}/${job.table}`, () => {
-        loaded += 1;
-        // Shards dominate the wait, so they own most of the bar.
-        setLoader(
-          "Loading benchmark results…",
-          10 + (90 * loaded) / jobs.length,
-          `${loaded} of ${jobs.length} result shards`,
-        );
-        setStatus("loading", `Loading data shards… ${loaded}/${jobs.length}`);
-      }).then((rows) => ({ table: job.table, rows })),
-    ),
-  );
-  state.index = index;
+  const preview = new URLSearchParams(location.search).get("testRuns") === "50";
+  const batches = runBatches(index.runs, preview ? 50 : null);
+  const total = batches.reduce((sum, batch) => sum + batch.length, 0);
+  state.index = { ...index, runs: [] };
   state.revision = revision;
   state.views = viewsData;
-  for (const group of groups) {
-    const key = group.table === "tool-calls" ? "toolCalls" : group.table;
-    state[key].push(...group.rows);
-  }
-  const observations = state.trials.length.toLocaleString();
   document.querySelector("#revision").textContent = revision.slice(0, 10);
   document.querySelector("#freshness").textContent = new Intl.DateTimeFormat(undefined, {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date());
-  document.querySelector("#observation-total").textContent = observations;
-  document.querySelector("#scoring-version").textContent =
-    `v${viewsData.scoring.version}`;
+  document.querySelector("#scoring-version").textContent = `v${viewsData.scoring.version}`;
   document.querySelector("#exclusion-policy").textContent =
     viewsData.exclusions?.policyId ?? "none";
-  setStatus(
-    "ready",
-    `Live dataset loaded · ${index.runs.length} run${index.runs.length === 1 ? "" : "s"} · ${observations} observations`,
-  );
   hideLoader();
+  setStatus("loading", `Published scores (all runs) · matrix evidence loading 0/${total}${preview ? " (50-run preview)" : ""}`);
   render();
-  // A shared link can point straight at a card.
   const initialCard = new URLSearchParams(location.search).get("card");
+  for (const batch of batches) {
+    const groups = await Promise.all(batch.flatMap((run) =>
+      ["profiles", "trials", "rounds", "tool-calls"].map(async (table) => ({
+        table,
+        rows: await fetchGzipJsonLines(root, run.files[table], `${run.runId}/${table}`),
+      })),
+    ));
+    for (const group of groups) {
+      const key = group.table === "tool-calls" ? "toolCalls" : group.table;
+      state[key].push(...group.rows);
+    }
+    state.index.runs.push(...batch);
+    const observations = state.trials.length.toLocaleString();
+    document.querySelector("#observation-total").textContent = observations;
+    setStatus("loading", `Published scores (all runs) · matrix evidence ${state.index.runs.length}/${total} runs · ${observations} trial records${preview ? " (50-run preview)" : ""}`);
+    render();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+  setStatus("ready", `Published scores (all runs) · matrix evidence ${state.index.runs.length}/${index.runs.length} runs · ${state.trials.length.toLocaleString()} trial records${preview ? " (50-run preview)" : ""}`);
   if (initialCard) {
     restoringCard = true;
     try {
@@ -3612,6 +3625,6 @@ renderColumnSettings();
 load().catch((error) => {
   console.error(error);
   hideLoader();
-  setStatus("error", `Could not load the public dataset. ${error.message}`);
+  setStatus("error", `${state.views ? "Run evidence stopped loading; published scores remain available" : "Could not load the public dataset"}. ${error.message}`);
   document.querySelector("#error-help").hidden = false;
 });

@@ -20,6 +20,15 @@ export function matrixHarnessGroup(harness) {
   return harness;
 }
 
+/** Split accepted runs into bounded batches, using the newest runs in preview mode. */
+export function runBatches(runs, limit = null, size = 5) {
+  const chosen = limit == null ? runs : runs.slice(-limit);
+  const batches = [];
+  for (let index = 0; index < chosen.length; index += size)
+    batches.push(chosen.slice(index, index + size));
+  return batches;
+}
+
 const metricNames = ["duration", "cost", "tokens"];
 /** Per-trial sample fields for each observed metric. */
 const SAMPLE_FIELDS = { duration: "seconds", cost: "costUsd", tokens: "tokens" };
