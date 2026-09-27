@@ -757,7 +757,12 @@ function renderMatrix(cells) {
       continue;
     }
     const expanded = state.expandedHarnesses.has(seriesCell.harness);
-    th.classList.toggle("matrix-expanded-head", expanded && seriesCell.compact);
+    const group = matrixHarnessGroup(seriesCell.harness);
+    const inExpandedGroup = (group === "DeepSeek" || group === "pi-extensions") &&
+      state.expandedMatrixGroups.has(group) && state.matrixGroups.has(
+        group === "DeepSeek" ? "harness" : "extension");
+    th.classList.toggle("matrix-expanded-head", expanded || inExpandedGroup ||
+      (seriesCell.grouped && state.expandedMatrixGroups.has(seriesCell.harness)));
     th.title = ["DeepSeek", "pi-extensions"].includes(seriesCell.harness)
       ? `${seriesCell.harness}\nMedian across the group's harnesses per provider route`
       : seriesCell.compact
