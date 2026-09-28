@@ -63,6 +63,25 @@ test("recent runs use their dataset acceptance date and median of full scores", 
   ]);
   assert.throws(() => recentRunHighlights(runs, rows, commits.slice(0, 2)), /acceptance date/);
 });
+
+test("batched acceptance dates come from the commit that first contains a run", async () => {
+  const { batchedRunDates } = await import("../scripts/build-snapshot.mjs");
+  const commits = [
+    { id: "new", title: "Accept 1 verified benchmark execution(s)", date: "2026-09-28T13:48:26Z" },
+    { id: "old", title: "Accept 1 verified benchmark execution(s)", date: "2026-09-28T13:27:45Z" },
+    { id: "before", title: "Other change", date: "2026-09-28T13:00:00Z" },
+  ];
+  const indexes = { new: ["first", "second"], old: ["first"], before: [] };
+  const fetcher = async (url) => {
+    const commit = String(url).split("/").at(-2);
+    return new Response(JSON.stringify({ runs: indexes[commit].map((runId) => ({ runId })) }));
+  };
+  const dates = await batchedRunDates(["first", "second"], commits,
+    "https://example.org/dataset", fetcher);
+  assert.equal(dates.get("first"), commits[1].date);
+  assert.equal(dates.get("second"), commits[0].date);
+});
+
 test("snapshot filters pre-aggregated configurations without dropping selected identities", () => {
   const row = { modelFamily: "model", provider: "provider", harnessFamily: "harness",
     harnessVersion: "1", taskFamilies: ["Language edits"], score: 0.8 };

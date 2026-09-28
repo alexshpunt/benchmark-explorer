@@ -14,13 +14,42 @@ import {
   verifyPublishedBytes,
 } from "../core.mjs";
 
+/** Find a batched run's acceptance commit by comparing adjacent pinned Dataset indexes. */
+export async function batchedRunDates(runIds, commits, dataset, fetcher = fetch) {
+  const missing = new Set(runIds);
+  const dates = new Map();
+  const indexes = new Map();
+  const at = async (commit) => {
+    if (!indexes.has(commit.id)) {
+      const response = await fetcher(`${dataset}/resolve/${commit.id}/dataset-index.json`);
+      if (!response.ok) throw Error(`Dataset index at ${commit.id}: HTTP ${response.status}`);
+      const index = await response.json();
+      if (!Array.isArray(index.runs)) throw Error(`Invalid Dataset index at ${commit.id}`);
+      indexes.set(commit.id, new Set(index.runs.map((run) => run.runId)));
+    }
+    return indexes.get(commit.id);
+  };
+  for (let index = 0; index < commits.length - 1 && missing.size; index++) {
+    const commit = commits[index];
+    if (!/^Accept \d+ verified benchmark execution\(s\)$/.test(commit.title)) continue;
+    const current = await at(commit);
+    if (![...missing].some((id) => current.has(id))) continue;
+    const previous = await at(commits[index + 1]);
+    for (const id of missing) if (current.has(id) && !previous.has(id)) {
+      dates.set(id, commit.date);
+      missing.delete(id);
+    }
+  }
+  return dates;
+}
+
 /** Give the three newest accepted runs their commit dates and full-run median scores. */
-export function recentRunHighlights(runs, rows, commits) {
+export function recentRunHighlights(runs, rows, commits, batchedDates = new Map()) {
   const dates = new Map(commits
     .filter((commit) => commit.title?.startsWith("Accept benchmark observation "))
     .map((commit) => [commit.title.slice("Accept benchmark observation ".length), commit.date]));
   return runs.slice(-3).reverse().map(({ runId }) => {
-    const acceptedAt = dates.get(runId);
+    const acceptedAt = dates.get(runId) ?? batchedDates.get(runId);
     if (!acceptedAt || !Number.isFinite(Date.parse(acceptedAt)))
       throw Error(`Missing Dataset acceptance date for ${runId}`);
     return {
@@ -82,7 +111,12 @@ export async function buildSnapshot({ dataset = "https://huggingface.co/datasets
     if (!commitsResponse.ok) throw Error(`Dataset commit history: HTTP ${commitsResponse.status}`);
     const commits = await commitsResponse.json();
     if (!Array.isArray(commits)) throw Error("Invalid Dataset commit history");
-    recentRuns = recentRunHighlights(index.runs, runRows.all, commits);
+    const recentIds = index.runs.slice(-3).map((run) => run.runId);
+    const explicit = new Set(commits.filter((commit) => commit.title?.startsWith("Accept benchmark observation "))
+      .map((commit) => commit.title.slice("Accept benchmark observation ".length)));
+    const missing = recentIds.filter((id) => !explicit.has(id));
+    const batched = missing.length ? await batchedRunDates(missing, commits, dataset, fetcher) : new Map();
+    recentRuns = recentRunHighlights(index.runs, runRows.all, commits, batched);
   }
   const snapshot = { schemaVersion: 1, revision, index, views, runRows, recentRuns, ...evidence };
   const bytes = gzipSync(JSON.stringify(snapshot), { level: 9 });
