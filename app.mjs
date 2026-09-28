@@ -106,6 +106,7 @@ const state = {
   matrixMetric: initialMatrixMetric,
   topSort: ["score", "cost", "balance"].includes(initialParams.get("topSort"))
     ? initialParams.get("topSort") : "score",
+  paretoX: initialParams.get("paretoX") === "tokens" ? "tokens" : "cost",
   topGroups: null,
   /** Harness families whose individual versions are visible in the matrix. */
   expandedHarnesses: new Set(initialControls.expandedHarnesses),
@@ -183,6 +184,7 @@ function currentSearch() {
   for (const group of [...state.expandedMatrixGroups].sort()) params.append("expandGroup", group);
   for (const selection of state.selected) params.append("select", selection);
   if (state.topSort !== "score") params.set("topSort", state.topSort);
+  if (state.paretoX !== "cost") params.set("paretoX", state.paretoX);
   if (initialParams.get("testRuns") === "50") params.set("testRuns", "50");
   if (state.card) params.set("card", state.card);
   const theme = new URLSearchParams(location.search).get("__theme");
@@ -325,7 +327,7 @@ function percentText(value) {
   return value == null ? "—" : `${(value * 100).toFixed(1)}%`;
 }
 
-const pareto = createPareto(state, toggleSelection);
+const pareto = createPareto(state, toggleSelection, render, syncUrl);
 const { COLUMN_BY_ID, DEFAULT_COLUMN_IDS, DEFAULT_COLUMN_LAYOUT, REQUIRED_COLUMN_IDS, saveColumnLayout,
   clearColumnDropIndicators, showColumnDropIndicator, moveLeaderboardColumn, applyLeaderboardColumnLayout,
   renderColumnSettings, renderResultsTable, addOverflowTitles } = createLeaderboard(state, {

@@ -65,7 +65,7 @@ export function createComparison(state, {
       harness.className = "selection-harness";
       harness.textContent = cell.overall ? "Across all harnesses" : cell.paired
         ? `${cell.harness} · ${cell.paired.pairs} pairs`
-        : `${cell.harness} ${compactVersion(cell.version)}`;
+        : `${cell.harness} ${compactVersion(cell.version)}${cell.reasoning ? ` · ${cell.reasoning}` : ""}`;
       const model = document.createElement("span");
       model.className = "selection-model";
       model.textContent = cell.model;

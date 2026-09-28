@@ -178,13 +178,14 @@
             <h2 id="pareto-title">Price × score frontier</h2>
             <p id="pareto-context"></p>
           </div>
-          <p>Squares: model routes × harnesses. Blue outlines: model medians; amber: harness medians.</p>
+          <label class="pareto-axis-control">Horizontal axis
+            <select id="pareto-x-axis" aria-label="Pareto horizontal axis">
+              <option value="cost">Full-run price</option>
+              <option value="tokens">Full-run tokens</option>
+            </select>
+          </label>
         </div>
-        <div class="pareto-whisker-legend" aria-label="Score range whiskers">
-          <span class="pareto-range-key pareto-range-key-repeats">Combination: repeated runs of latest full version</span>
-          <span class="pareto-range-key">Model: across harnesses</span>
-          <span class="pareto-range-key pareto-range-key-harness">Harness: across models</span>
-        </div>
+        <p class="pareto-chart-key">Solid green: Pareto frontier · Dashed blue: same combination at different reasoning levels · Whisker: repeated runs</p>
         <div class="pareto-layout">
           <div class="pareto-chart-wrap">
             <div id="pareto-chart" role="region" aria-label="Price and score chart"></div>
@@ -197,11 +198,11 @@
               <div id="pareto-nearby-list"></div>
             </section>
             <h3 id="pareto-list-title">On the frontier</h3>
-            <p>Cheaper runs with the highest score at each price.</p>
+            <p id="pareto-list-description">Lowest price with the highest score at each step.</p>
             <ol id="pareto-list"></ol>
           </aside>
         </div>
-        <p class="pareto-note">Only combinations with a fully measured price are plotted; summaries need at least one priced route. The line joins real, non-dominated combinations; model and harness medians do not change it. Combination squares use the latest full harness version: their score and price are medians of independent runs, and a whisker appears only when repeated runs disagree. Model squares show score spread across harnesses; harness squares show spread across models. Summary scores and ranges include full runs without a price; summary prices use only measured routes, with coverage shown on hover. Click a square or list entry to compare up to four. Overlapping points can be chosen from Nearby points. Filters also apply here.</p>
+        <p class="pareto-note">Only full runs with a fully measured value on the chosen axis appear; prices are never estimated. Each square is one model route, harness version and reasoning level. Repeated full runs contribute one median point and a whisker if scores differ. The frontier is recalculated for the selected axis. Click a square or frontier entry to compare up to four; use Nearby points when squares overlap. Filters apply here too.</p>
       </section>
       <section class="summary-row" aria-label="Model route and harness matrix">
         <section class="panel matrix-panel">
