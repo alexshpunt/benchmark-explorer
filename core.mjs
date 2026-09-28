@@ -802,6 +802,46 @@ export function precomputedFamilyScore(row, family) {
     null
   );
 }
+function leaderboardRowsForFamilies(rows, families) {
+  const wanted = new Set(families);
+  const benchmarkTasks = new Set(rows.flatMap((row) =>
+    (row.configurationTaskCells ?? []).filter((cell) => wanted.has(taskFamily(cell.taskId)))
+      .map((cell) => cell.taskId)));
+  return rows.flatMap((row) => {
+    const byTask = new Map();
+    for (const cell of row.configurationTaskCells ?? []) {
+      if (!wanted.has(taskFamily(cell.taskId))) continue;
+      const values = byTask.get(cell.taskId) ?? [];
+      values.push(cell);
+      byTask.set(cell.taskId, values);
+    }
+    if (!byTask.size) return [];
+    const tasks = [...byTask.values()].map((cells) => ({
+      firstExactRate: mean(cells.map((cell) => cell.firstExactRate)),
+      finalExactRate: mean(cells.map((cell) => cell.finalExactRate)),
+      observations: cells.reduce((total, cell) => total + (cell.observations ?? 0), 0),
+    }));
+    const firstExactRate = mean(tasks.map((task) => task.firstExactRate));
+    const finalExactRate = mean(tasks.map((task) => task.finalExactRate));
+    const qualityScore = 0.75 * firstExactRate + 0.25 * finalExactRate;
+    const coverage = benchmarkTasks.size ? byTask.size / benchmarkTasks.size : 0;
+    return [{
+      ...row,
+      firstExactRate,
+      finalExactRate,
+      recoveryGain: finalExactRate - firstExactRate,
+      qualityScore,
+      coverage,
+      score: qualityScore * coverage,
+      observations: tasks.reduce((total, task) => total + task.observations, 0),
+      taskCount: byTask.size,
+      benchmarkTaskCount: benchmarkTasks.size,
+      complete: coverage === 1,
+      taskFamilies: [...wanted].sort(),
+    }];
+  });
+}
+
 /**
  * Build a configurable leaderboard. Empty benchmark and reasoning filters mean
  * “All”: exact observations roll up by reasoning, benchmark version and family.
@@ -811,7 +851,9 @@ export function aggregateLeaderboard(_index, _profiles, _trials, _rounds, filter
   const families = filters.taskFamily ?? [];
   const rows = families.length === 1
     ? precomputedViews.taskFamilies[families[0]] ?? []
-    : precomputedViews.leaderboard;
+    : families.length > 1
+      ? leaderboardRowsForFamilies(precomputedViews.leaderboard, families)
+      : precomputedViews.leaderboard;
   const full = new Set(precomputedViews.fullRunKeys ??
     precomputedViews.leaderboard.filter(fullBenchmarkRun)
       .flatMap((row) => (row.runIds ?? []).flatMap((runId) =>

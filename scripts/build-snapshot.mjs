@@ -62,10 +62,14 @@ export function recentRunHighlights(runs, rows, commits, batchedDates = new Map(
 }
 /** Build one revision-pinned, checked Explorer artifact from accepted Dataset files. */
 export async function buildSnapshot({ dataset = "https://huggingface.co/datasets/alexshpunt/explicit-edit-benchmark",
-  output = "dist", fetcher = fetch } = {}) {
-  const indexResponse = await fetcher(`${dataset}/resolve/main/dataset-index.json`);
+  output = "dist", revision: requestedRevision = null, fetcher = fetch } = {}) {
+  const indexResponse = await fetcher(
+    `${dataset}/resolve/${requestedRevision ?? "main"}/dataset-index.json`,
+  );
   if (!indexResponse.ok) throw Error(`Dataset index: HTTP ${indexResponse.status}`);
   const revision = datasetRevision(indexResponse.headers);
+  if (requestedRevision && requestedRevision !== revision)
+    throw Error(`Requested Dataset revision ${requestedRevision} resolved to ${revision}`);
   const root = pinnedDatasetRoot(dataset, revision);
   const index = await indexResponse.json();
   const checked = async (file) => {
@@ -119,18 +123,28 @@ export async function buildSnapshot({ dataset = "https://huggingface.co/datasets
     recentRuns = recentRunHighlights(index.runs, runRows.all, commits, batched);
   }
   const snapshot = { schemaVersion: 1, revision, index, views, runRows, recentRuns, ...evidence };
-  const bytes = gzipSync(JSON.stringify(snapshot), { level: 9 });
+  const bytes = gzipSync(JSON.stringify(snapshot), { level: 9, mtime: 0 });
   const sha256 = createHash("sha256").update(bytes).digest("hex");
-  await mkdir(resolve(output), { recursive: true });
-  await writeFile(resolve(output, "snapshot.json.gz"), bytes);
-  await writeFile(resolve(output, "snapshot-manifest.json"), JSON.stringify({ schemaVersion: 1, revision,
-    file: "snapshot.json.gz", sha256, trials: evidence.trials.length }) + "\n");
+  const file = `snapshots/snapshot.${sha256}.json.gz`;
+  await mkdir(resolve(output, "snapshots"), { recursive: true });
+  await writeFile(resolve(output, file), bytes);
+  await writeFile(resolve(output, "snapshot-manifest.json"), JSON.stringify({
+    schemaVersion: 1,
+    revision,
+    file,
+    sha256,
+    bytes: bytes.length,
+    trials: evidence.trials.length,
+  }) + "\n");
   return { revision, trials: evidence.trials.length, bytes: bytes.length };
 }
 
 if (process.argv[1] && import.meta.url === new URL(`file://${resolve(process.argv[1])}`).href) {
   globalThis.crypto ??= webcrypto;
-  buildSnapshot({ output: process.argv[2] ?? "dist" }).then(console.log).catch((error) => {
+  buildSnapshot({
+    output: process.argv[2] ?? "dist",
+    revision: process.env.DATASET_REVISION || null,
+  }).then(console.log).catch((error) => {
     console.error(error);
     process.exitCode = 1;
   });

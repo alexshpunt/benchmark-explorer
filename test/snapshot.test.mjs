@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { buildSnapshot, recentRunHighlights } from "../scripts/build-snapshot.mjs";
-import { filterSnapshotRunRows } from "../core.mjs";
+import { aggregateLeaderboard, filterSnapshotRunRows, setViewsData } from "../core.mjs";
 
 const revision = "a".repeat(40);
 const views = { schemaVersion: 1, scoring: { id: "explicit-edit-score", version: 2 },
@@ -31,6 +31,8 @@ test("snapshot pins and verifies dataset files before publishing an artifact", a
     const manifest = JSON.parse(await readFile(join(output, "snapshot-manifest.json")));
     const compressed = await readFile(join(output, manifest.file));
     assert.equal(manifest.revision, revision);
+    assert.match(manifest.file, /^snapshots\/snapshot\.[a-f0-9]{64}\.json\.gz$/);
+    assert.equal(manifest.file, `snapshots/snapshot.${manifest.sha256}.json.gz`);
     assert.equal(createHash("sha256").update(compressed).digest("hex"), manifest.sha256);
     assert.equal(JSON.parse(gunzipSync(compressed)).revision, revision);
     assert.deepEqual(requests, ["https://example.org/dataset/resolve/main/dataset-index.json",
@@ -80,6 +82,28 @@ test("batched acceptance dates come from the commit that first contains a run", 
     "https://example.org/dataset", fetcher);
   assert.equal(dates.get("first"), commits[1].date);
   assert.equal(dates.get("second"), commits[0].date);
+});
+
+test("multiple task families recompute leaderboard scores from the selected tasks", () => {
+  const row = {
+    modelFamily: "model", provider: "provider", harnessFamily: "harness",
+    runIds: ["run"], configurationHashes: ["configuration"], rankingEligible: true,
+    configurationTaskCells: [
+      { taskId: "language-a", observations: 1, firstExactRate: 1, finalExactRate: 1 },
+      { taskId: "unicode-fix-a", observations: 1, firstExactRate: 0, finalExactRate: 0 },
+      { taskId: "replace-block-a", observations: 1, firstExactRate: 0, finalExactRate: 0 },
+    ],
+    firstExactRate: 1 / 3, finalExactRate: 1 / 3, qualityScore: 1 / 3,
+    coverage: 1, score: 1 / 3,
+  };
+  setViewsData({ schemaVersion: 1, leaderboard: [row], taskFamilies: {}, fullRunKeys: [] });
+  const [selected] = aggregateLeaderboard(null, null, null, null, {
+    taskFamily: ["Language edits", "Unicode fixes"],
+  });
+  assert.equal(selected.firstExactRate, 0.5);
+  assert.equal(selected.finalExactRate, 0.5);
+  assert.equal(selected.score, 0.5);
+  assert.deepEqual(selected.taskFamilies, ["Language edits", "Unicode fixes"]);
 });
 
 test("snapshot filters pre-aggregated configurations without dropping selected identities", () => {

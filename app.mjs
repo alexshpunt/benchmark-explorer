@@ -478,27 +478,29 @@ function renderRecentRuns() {
     return item;
   }));
 }
-async function load() {
-  if (typeof DecompressionStream === "undefined")
-    throw new Error("This browser does not support gzip streams. Use a current browser.");
-  setLoader("Loading benchmark results…", 5, "Reading the snapshot manifest");
-  const manifestResponse = await fetch("./snapshot-manifest.json", { cache: "no-store" });
-  if (!manifestResponse.ok) throw Error(`Snapshot manifest: HTTP ${manifestResponse.status}`);
-  const manifest = await manifestResponse.json();
-  if (manifest.schemaVersion !== 1 || !/^[a-f0-9]{40}$/.test(manifest.revision) ||
-      manifest.file !== "snapshot.json.gz") throw Error("Unsupported snapshot manifest");
-  const response = await fetch(`./${manifest.file}`, { cache: "no-store" });
-  if (!response.ok) throw Error(`Snapshot: HTTP ${response.status}`);
-  const bytes = await response.arrayBuffer();
+const SNAPSHOT_CACHE = "benchmark-explorer:snapshots:v1";
+const SNAPSHOT_MANIFEST_KEY = "benchmark-explorer:snapshot-manifest:v1";
+let initialViewRestored = false;
+
+function validSnapshotManifest(manifest) {
+  return manifest?.schemaVersion === 1 && /^[a-f0-9]{40}$/.test(manifest.revision) &&
+    /^snapshots\/snapshot\.[a-f0-9]{64}\.json\.gz$/.test(manifest.file) &&
+    manifest.file === `snapshots/snapshot.${manifest.sha256}.json.gz`;
+}
+
+async function parseSnapshot(manifest, bytes) {
   await verifyPublishedBytes(bytes, manifest.sha256);
   const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("gzip"));
   const snapshot = JSON.parse(await new Response(stream).text());
   if (snapshot.schemaVersion !== 1 || snapshot.revision !== manifest.revision ||
       !Array.isArray(snapshot.runRows?.all) || !Array.isArray(snapshot.recentRuns) ||
-      !Array.isArray(snapshot.trials) ||
-      snapshot.trials.length !== manifest.trials)
+      !Array.isArray(snapshot.trials) || snapshot.trials.length !== manifest.trials)
     throw Error("Snapshot contents do not match the manifest");
   validateDatasetSnapshot(snapshot.index, snapshot.views);
+  return snapshot;
+}
+
+function installSnapshot(snapshot, freshness) {
   setViewsData(snapshot.views);
   state.snapshot = snapshot;
   state.index = snapshot.index;
@@ -515,13 +517,55 @@ async function load() {
   renderRecentRuns();
   hideLoader();
   render();
-  const initialCard = new URLSearchParams(location.search).get("card");
-  if (initialCard) {
-    restoringCard = true;
-    try { openCard(initialCard); } finally { restoringCard = false; }
+  setStatus("ready", `${freshness} · Dataset ${snapshot.revision.slice(0, 8)}`);
+  if (!initialViewRestored) {
+    initialViewRestored = true;
+    const initialCard = new URLSearchParams(location.search).get("card");
+    if (initialCard) {
+      restoringCard = true;
+      try { openCard(initialCard); } finally { restoringCard = false; }
+    }
+    syncUrl();
+    if (location.hash === "#matrix-title") document.querySelector("#matrix-title").scrollIntoView();
   }
-  syncUrl();
-  if (location.hash === "#matrix-title") document.querySelector("#matrix-title").scrollIntoView();
+}
+
+async function cachedSnapshot() {
+  if (!("caches" in globalThis)) return null;
+  const manifest = readPreference(SNAPSHOT_MANIFEST_KEY);
+  if (!validSnapshotManifest(manifest)) return null;
+  const response = await (await caches.open(SNAPSHOT_CACHE)).match(`./${manifest.file}`);
+  if (!response) return null;
+  return { manifest, snapshot: await parseSnapshot(manifest, await response.arrayBuffer()) };
+}
+
+async function load() {
+  if (typeof DecompressionStream === "undefined")
+    throw new Error("This browser does not support gzip streams. Use a current browser.");
+  setLoader("Loading benchmark results…", 5, "Checking the saved snapshot");
+  const saved = await cachedSnapshot().catch(() => null);
+  if (saved) installSnapshot(saved.snapshot, "Saved snapshot; checking freshness");
+
+  const manifestResponse = await fetch("./snapshot-manifest.json", { cache: "no-store" });
+  if (!manifestResponse.ok) throw Error(`Snapshot manifest: HTTP ${manifestResponse.status}`);
+  const manifest = await manifestResponse.json();
+  if (!validSnapshotManifest(manifest)) throw Error("Unsupported snapshot manifest");
+  if (saved?.manifest.sha256 === manifest.sha256) {
+    setStatus("ready", `Published snapshot · Dataset ${manifest.revision.slice(0, 8)}`);
+    return;
+  }
+
+  setLoader("Loading benchmark results…", 35, "Downloading the current snapshot");
+  const response = await fetch(`./${manifest.file}`);
+  if (!response.ok) throw Error(`Snapshot: HTTP ${response.status}`);
+  const bytes = await response.arrayBuffer();
+  const snapshot = await parseSnapshot(manifest, bytes);
+  if ("caches" in globalThis) {
+    const cache = await caches.open(SNAPSHOT_CACHE);
+    await cache.put(`./${manifest.file}`, new Response(bytes));
+    writePreference(SNAPSHOT_MANIFEST_KEY, manifest);
+  }
+  installSnapshot(snapshot, "Published snapshot");
 }
 
 closeOnOutsideClick(document.querySelector("#cell-details"));
