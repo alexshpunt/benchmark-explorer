@@ -17,27 +17,32 @@ test("top five needs three independent routes and ignores partial or unpriced co
     row("alpha", "p2", "h2", 0.1, 0.01, { fullBenchmark: false }),
     row("beta", "p3", "h1", 1, 0.2),
     row("beta", "p3", "h3", 0.99, 0.3),
+    row("alpha", "p1", "pi-default", 0.8, 1),
+    row("alpha", "p2", "pi-default", 0.8, 1),
+    row("beta", "p3", "pi-default", 0.8, 1),
   ];
   const { models, harnesses } = topFiveGroups(rows, rows.map((item) => item.runId));
-  assert.deepEqual(models.map((item) => item.name), ["alpha"]);
-  assert.equal(models[0].routes, 4);
+  assert.deepEqual(models.map((item) => item.name), ["alpha", "beta"]);
+  assert.equal(models[0].routes, 6);
   // Each provider gets one vote after its harness routes are combined.
   assert.equal(models[0].score, 0.75);
-  assert.equal(models[0].cost, 1.75); // one vote for each provider after missing cost is excluded
-  assert.deepEqual(harnesses.map((item) => item.name), ["h1"]);
+  assert.equal(models[0].cost, 1.5); // one vote for each provider after missing cost is excluded
+  assert.deepEqual(harnesses.map((item) => item.name), ["h1", "pi-default"]);
   assert.equal(harnesses[0].routes, 3);
+  assert.ok(Math.abs(harnesses[0].score - (0.9 + 0.7 + 1) / 3) < 1e-10);
+  assert.ok(Math.abs(harnesses[0].delta - (harnesses[0].score - 0.8)) < 1e-10);
 });
 
-test("latest harness version wins per model route, not the best or most repeated run", () => {
+test("an older harness version cannot fill missing routes in the top five", () => {
   const rows = [
     row("a", "p", "h", 1, 1, { version: "1.0.0", runId: "old" }),
     row("a", "p", "h", 0.7, null, { version: "2.0.0", runId: "new" }),
     row("b", "p", "h", 0.8, 2),
     row("c", "p", "h", 0.9, 3),
+    ...["a", "b", "c"].map((model) => row(model, "p", "pi-default", 0.5, 1)),
   ];
-  const { harnesses } = topFiveGroups(rows, ["old", "new", "b-h", "c-h"]);
-  assert.equal(harnesses[0].score, 0.8);
-  assert.equal(harnesses[0].cost, 2.5);
+  const { harnesses } = topFiveGroups(rows, rows.map((item) => item.runId));
+  assert.deepEqual(harnesses.map((item) => item.name), ["pi-default"]);
 });
 
 test("balance ranks only fully priced groups and breaks ties by score", () => {

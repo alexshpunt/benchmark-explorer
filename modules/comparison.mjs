@@ -63,9 +63,10 @@ export function createComparison(state, {
       button.title = `Open ${cell.model} · ${cell.label}`;
       const harness = document.createElement("span");
       harness.className = "selection-harness";
-      harness.textContent = cell.overall ? "Across all harnesses" : cell.paired
-        ? `${cell.harness} · ${cell.paired.pairs} pairs`
+      harness.textContent = cell.baseline
+        ? `${cell.harness} · ${cell.baseline.covered}/${cell.baseline.total} measured routes`
         : `${cell.harness} ${compactVersion(cell.version)}${cell.reasoning ? ` · ${cell.reasoning}` : ""}`;
+      if (cell.baseline) button.title += " · comparison details include measured routes only; the summary score also uses baseline for missing routes";
       const model = document.createElement("span");
       model.className = "selection-model";
       model.textContent = cell.model;

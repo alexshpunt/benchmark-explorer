@@ -1,11 +1,16 @@
-import { canonicalModelFamily, compareHarnessVersions, median } from "../core.mjs";
+import { canonicalModelFamily, compareHarnessVersions, median, modelRouteIdentity } from "../core.mjs";
+import { baselineHarnessScores } from "./baseline-score.mjs";
 
 const byName = (a, b) => a.name.localeCompare(b.name);
 const byScore = (a, b) => b.score - a.score || byName(a, b);
 const byCost = (a, b) => a.cost - b.cost || byScore(a, b);
+const deltaText = (value) => {
+  const points = Math.abs(value * 100) < 0.05 ? 0 : value * 100;
+  return `${points >= 0 ? "+" : ""}${points.toFixed(1)} pp`;
+};
 
 /** Build comparable family summaries from full runs, giving each route one vote. */
-export function topFiveGroups(rows, acceptedRunIds) {
+export function topFiveGroups(rows, acceptedRunIds, baselineHarness = "pi-default") {
   const order = new Map(acceptedRunIds.map((id, index) => [id, index]));
   const routes = new Map();
   for (const row of rows) {
@@ -28,10 +33,8 @@ export function topFiveGroups(rows, acceptedRunIds) {
       Number.isFinite(row.cost.total)).map((row) => row.cost.total)),
   }));
   const models = new Map();
-  const harnesses = new Map();
   for (const route of selected) {
     models.set(route.model, [...(models.get(route.model) ?? []), route]);
-    harnesses.set(route.harness, [...(harnesses.get(route.harness) ?? []), route]);
   }
   return {
     models: [...models].filter(([, items]) => items.length >= 3).map(([name, items]) => {
@@ -43,10 +46,20 @@ export function topFiveGroups(rows, acceptedRunIds) {
         cost: median([...providers.values()].map((group) => median(group.map((item) => item.cost)))),
       };
     }),
-    harnesses: [...harnesses].filter(([, items]) => items.length >= 3).map(([name, items]) => ({
-      name, routes: items.length, score: median(items.map((item) => item.score)),
-      cost: median(items.map((item) => item.cost)),
-    })),
+    harnesses: [...baselineHarnessScores(rows, acceptedRunIds, baselineHarness).harnesses]
+      .filter(([, result]) => result.covered >= 3)
+      .map(([name, result]) => {
+        const measuredCosts = result.rows.filter((row) => row.cost?.observations === row.observations &&
+          Number.isFinite(row.cost.total));
+        const costs = new Map();
+        for (const row of measuredCosts) {
+          const route = modelRouteIdentity(row);
+          costs.set(route, [...(costs.get(route) ?? []), row.cost.total]);
+        }
+        return { name, routes: result.covered, total: result.total, delta: result.delta, baselineHarness,
+          score: result.score, cost: measuredCosts.length === result.rows.length
+            ? median([...costs.values()].map(median)) : null };
+      }),
   };
 }
 
@@ -88,13 +101,16 @@ export function renderTopFive(groups, criterion, hrefFor) {
       const name = document.createElement("strong");
       name.textContent = item.name;
       const count = document.createElement("small");
-      count.textContent = `${item.routes} routes`;
+      count.textContent = kind === "harnesses"
+        ? `${item.routes}/${item.total} routes · ${((item.routes / item.total) * 100).toFixed(1)}% · ${deltaText(item.delta)} vs ${item.baselineHarness}`
+        : `${item.routes} routes`;
+      count.title = count.textContent;
       label.append(name, count);
       const values = document.createElement("span");
       values.className = "top-five-values";
       const score = document.createElement("b");
       score.textContent = (item.score * 100).toFixed(1);
-      score.title = "Median score";
+      score.title = kind === "harnesses" ? "Baseline-adjusted mean score across all baseline model routes" : "Median score";
       const price = document.createElement("span");
       price.textContent = item.cost == null ? "—" : `$${item.cost.toFixed(item.cost < 0.01 ? 3 : 2)}`;
       price.title = item.cost == null ? "No fully measured price" : "Median price for a full run";

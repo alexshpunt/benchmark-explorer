@@ -154,7 +154,7 @@
         </div>
         <details class="top-five-guide">
           <summary>How these rankings work</summary>
-          <p>Only full benchmark runs count. A model needs at least three provider–harness routes; a harness needs at least three model–provider routes. Each route gets one vote. Models are first grouped by provider; harnesses use the newest accepted version on each route. Scores are medians. Price is the median cost of full runs with every trial priced; “—” means no complete price was reported. Score ranking keeps unpriced entries; Price and Balance exclude them. Balance adds the score rank and price rank with equal weight among entries with both. Bars show place in the selected ranking. These lists use the whole published snapshot, not the filters in the table above.</p>
+          <p>Only full benchmark runs count. Models need at least three provider–harness routes; their score is the median across providers. Harnesses need at least three measured model–provider routes. Every harness uses its latest version with a full run anywhere. Its score is the mean over every model–provider route with a full pi-default baseline: a measured route replaces that baseline, while an untested route keeps it. Full repeats are first reduced to one median score per route. Each baseline route uses its latest full pi-default run, even if another route has a newer baseline version. Coverage and the score change from pi-default appear beside the harness name. Price uses only fully measured full runs; “—” means the measured routes lack a complete price. Score ranking keeps unpriced entries; Price and Balance exclude them. Balance adds the score rank and price rank with equal weight among entries with both. Bars show place in the selected ranking. These lists use the whole published snapshot, not the filters in the table above.</p>
         </details>
       </section>
       <section class="status-bar" aria-label="Dataset error" hidden>
@@ -228,11 +228,11 @@
               Rows are model routes and columns are harnesses. A compact harness column uses each
               model's latest available version and accepted run; hover a value to see that source.
               Use the arrow beside a harness to compare its versions side by side.
-              Across all harnesses pools full runs for each model. In Score, Across all models
-              shows the median score difference from pi-default on the same model families,
-              with one vote per model and at least three matched families required. A plus sign
-              means the harness scored higher than pi-default. Other metrics show medians across
-              models. The top-left corner has no score. Only full benchmark runs contribute to summaries.
+              There is no model summary across harnesses. In Score, Across all models shows
+              each harness's baseline-adjusted mean over the same full pi-default model–provider
+              routes. Untested routes use their pi-default score. The change and measured coverage
+              appear under the score. Other metrics show medians across measured model families.
+              Only full benchmark runs contribute to summaries.
               In Score, an incomplete cell shows a dash and the largest single run's task count
               (N/total tasks) instead of a misleading score. Select a value to compare
               configurations, or select a row or column label to open details.

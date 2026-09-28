@@ -21,9 +21,11 @@ import { createComparison } from "./modules/comparison.mjs";
 import { createMatrix } from "./modules/matrix.mjs";
 import { createPareto } from "./modules/pareto.mjs";
 import { topFiveGroups, renderTopFive } from "./modules/top-five.mjs";
+import { baselineHarnessScores } from "./modules/baseline-score.mjs";
 
 /** Public home of the accepted data, and the base for every provenance link. */
 const DATASET_PAGE = "https://huggingface.co/datasets/alexshpunt/explicit-edit-benchmark";
+const BASELINE_HARNESS = "pi-default";
 /** Comparison series colours, resolved per theme by styles/comparison.css. */
 const COLORS = ["var(--series-1)", "var(--series-2)", "var(--series-3)", "var(--series-4)"];
 const FILTER_LABELS = {
@@ -108,6 +110,7 @@ const state = {
     ? initialParams.get("topSort") : "score",
   paretoX: initialParams.get("paretoX") === "tokens" ? "tokens" : "cost",
   topGroups: null,
+  baselineScores: null,
   /** Harness families whose individual versions are visible in the matrix. */
   expandedHarnesses: new Set(initialControls.expandedHarnesses),
   matrixGroups: new Set(
@@ -218,9 +221,6 @@ function configToken(row) {
   ].join("|");
 }
 
-/** Harness value of a cell that covers every harness of its model. */
-const OVERALL = "all";
-
 /** Rows behind a card scope: "all", one configuration, or every harness. */
 function scopeOf(token) {
   if (!token || token === "all") return state.configurations;
@@ -317,7 +317,7 @@ function mean(values) {
 }
 
 const { matrixCells, groupedMatrixCells, renderMatrix, rowsForCell, cellKeyFromRow, toggleSelection } = createMatrix(state, {
-  mean, OVERALL, COLORS, selectedValues, syncUrl, render, renderMatrixState,
+  mean, COLORS, selectedValues, syncUrl, render, renderMatrixState,
   openModelDetails: (...args) => openModelDetails(...args),
   openHarnessDetails: (...args) => openHarnessDetails(...args),
 });
@@ -508,7 +508,9 @@ async function load() {
   state.trials = snapshot.trials;
   state.rounds = snapshot.rounds;
   state.toolCalls = snapshot.toolCalls;
-  state.topGroups = topFiveGroups(snapshot.runRows.all, snapshot.index.runs.map((run) => run.runId));
+  const acceptedRunIds = snapshot.index.runs.map((run) => run.runId);
+  state.baselineScores = baselineHarnessScores(snapshot.runRows.all, acceptedRunIds, BASELINE_HARNESS);
+  state.topGroups = topFiveGroups(snapshot.runRows.all, acceptedRunIds, BASELINE_HARNESS);
   updateTopFive();
   renderRecentRuns();
   hideLoader();

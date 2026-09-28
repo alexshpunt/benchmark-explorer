@@ -73,28 +73,6 @@ export function matrixAcrossModels(cells, column, rowsOf = (cell) => cell.source
     tokenObservations: representatives.reduce((sum, group) => sum + (group[0].tokenObservations ?? 0), 0),
   };
 }
-/** Median paired score difference from pi-default, with one vote per shared model family. */
-export function matrixMatchedHarnessDelta(cells, column, minimum = 3) {
-  const byFamily = (matches) => {
-    const groups = new Map();
-    for (const cell of matches.filter((item) => Number.isFinite(item.score))) {
-      const family = cell.model.split("\t")[0];
-      groups.set(family, [...(groups.get(family) ?? []), cell]);
-    }
-    return new Map([...groups].map(([family, members]) => {
-      const parent = members.find((cell) => cell.model === family);
-      return [family, { score: parent ? parent.score : median(members.map((cell) => cell.score)),
-        members: parent ? [parent] : members }];
-    }));
-  };
-  const baseline = byFamily(cells.filter((cell) => cell.columnKey === "pi-default"));
-  const target = byFamily(cells.filter((cell) => cell.columnKey === column.columnKey));
-  const modelFamilies = [...target.keys()].filter((family) => baseline.has(family));
-  const differences = modelFamilies.map((family) => target.get(family).score - baseline.get(family).score);
-  return { delta: modelFamilies.length >= minimum ? median(differences) : null,
-    pairs: modelFamilies.length, modelFamilies,
-    matchedCells: modelFamilies.flatMap((family) => target.get(family).members) };
-}
 /** Best single incomplete run in a cell, measured against the published task set. */
 export function matrixPartialCoverage(rows, total) {
   if (!total || rows.some((row) => row.fullBenchmark)) return null;
@@ -103,7 +81,7 @@ export function matrixPartialCoverage(rows, total) {
 }
 /** Create the matrix with shared state and actions supplied by the entry point. */
 export function createMatrix(state, {
-  mean, OVERALL, COLORS, selectedValues, syncUrl, render, renderMatrixState,
+  mean, COLORS, selectedValues, syncUrl, render, renderMatrixState,
   openModelDetails, openHarnessDetails,
 }) {
   function cellKey(model, harness, version) {
@@ -147,33 +125,6 @@ export function createMatrix(state, {
   }
 
   function matrixCells(configurationRows, compactRows, expandedHarnesses) {
-    const byModel = new Map();
-    for (const row of configurationRows) {
-      const model = modelRouteIdentity(row);
-      byModel.set(model, [...(byModel.get(model) ?? []), row]);
-    }
-    // The overall cell of a model pools its trials task by task, exactly like the
-    // group score a model card reports.
-    const overall = [...byModel].map(([model, rows]) => {
-      const full = rows.filter((row) => row.fullBenchmark);
-      const group = aggregateGroupScore(full);
-      return {
-        key: cellKey(model, OVERALL, null),
-        columnKey: OVERALL,
-        model,
-        harness: OVERALL,
-        version: null,
-        overall: true,
-        label: "Across all harnesses",
-        score: group.score,
-        firstExactRate: group.firstExactRate,
-        finalExactRate: group.finalExactRate,
-        recoveryGain: null,
-        duration: mean(full.map((row) => row.durationSummary.averageCase)),
-        observations: full.reduce((sum, row) => sum + row.observations, 0),
-        ...matrixMetricSummary(full, group.score),
-      };
-    });
     const visible = [];
     const exactGroups = new Map();
     for (const row of configurationRows) {
@@ -218,7 +169,7 @@ export function createMatrix(state, {
       }
       visible.push(summary);
     }
-    return [...overall, ...visible];
+    return visible;
   }
 
   const MATRIX_METRICS = {
@@ -269,7 +220,7 @@ export function createMatrix(state, {
     return state.configurations.filter(
       (row) =>
         modelRouteIdentity(row) === cell.model &&
-        (cell.overall || (row.harnessFamily === cell.harness && row.harnessVersion === cell.version)),
+        (row.harnessFamily === cell.harness && row.harnessVersion === cell.version),
     );
   }
 
@@ -374,27 +325,27 @@ export function createMatrix(state, {
     for (const cell of cells) add(cell);
     const columnGroups = new Map();
     for (const cell of cells) {
-      if (cell.overall || !cell.compact) continue;
+      if (!cell.compact) continue;
       const label = matrixHarnessGroup(cell.harness);
       if ((label === "DeepSeek" && harnesses) || (label === "pi-extensions" && extensions)) {
         const key = JSON.stringify([cell.model, label]);
         columnGroups.set(key, [...(columnGroups.get(key) ?? []), cell]);
       }
     }
-    const collapse = (members, model, columnKey, harness) => {
+    const collapse = (members, model, columnKey, harness, groupedHarness = false) => {
       const first = members[0];
       const fields = ["score", "firstExactRate", "finalExactRate", "recoveryGain", "duration", "averageCost", "averageTokens", "qualityPerDollar"];
       const values = Object.fromEntries(fields.map((field) => [field, providerMedian(members, field)]));
       return { ...first, ...values, key: "group:" + JSON.stringify([model, columnKey]), model,
-        columnKey, harness, label: harness === OVERALL ? "Across all harnesses" : harness,
-        compact: first.compact, grouped: true, sourceRows: [...new Set(members.flatMap(rowsForCell))],
+        columnKey, harness, label: harness,
+        compact: first.compact, grouped: true, groupedHarness, sourceRows: [...new Set(members.flatMap(rowsForCell))],
         observations: members.reduce((sum, cell) => sum + cell.observations, 0),
         costObservations: members.reduce((sum, cell) => sum + cell.costObservations, 0),
         tokenObservations: members.reduce((sum, cell) => sum + cell.tokenObservations, 0) };
     };
     for (const [key, members] of columnGroups) {
       const [model, label] = JSON.parse(key);
-      add(collapse(members, model, label, label));
+      add(collapse(members, model, label, label, true));
     }
     if (models) {
       const familyGroups = new Map();
@@ -405,7 +356,7 @@ export function createMatrix(state, {
       }
       for (const [key, members] of familyGroups) {
         const [family, columnKey] = JSON.parse(key);
-        add(collapse(members, family, columnKey, members[0].harness));
+        add(collapse(members, family, columnKey, members[0].harness, members[0].groupedHarness));
       }
     }
     return [...groups.values()].filter((cell) => {
@@ -422,27 +373,19 @@ export function createMatrix(state, {
     root.replaceChildren();
     const metric = MATRIX_METRICS[state.matrixMetric];
     document.querySelector("#matrix-metric").value = state.matrixMetric;
-    const overallScore = new Map(
-      cells.filter((cell) => cell.overall).map((cell) => [cell.model, cell.score ?? 0]),
-    );
     const models = [...new Set(cells.map((cell) => cell.model))].sort((left, right) => {
       const leftFamily = left.split("\t")[0];
       const rightFamily = right.split("\t")[0];
       if (state.matrixGroups.has("model") && leftFamily === rightFamily)
         return Number(left.includes("\t")) - Number(right.includes("\t")) || left.localeCompare(right);
-      return (overallScore.get(rightFamily) ?? overallScore.get(right) ?? 0) -
-        (overallScore.get(leftFamily) ?? overallScore.get(left) ?? 0) || left.localeCompare(right);
+      return left.localeCompare(right);
     });
-    const overall = cells.find((cell) => cell.overall);
     const byHarness = new Map();
-    for (const cell of cells.filter((candidate) => !candidate.overall)) {
+    for (const cell of cells) {
       byHarness.set(cell.harness, [...(byHarness.get(cell.harness) ?? []), cell]);
     }
-    const rankByHarness = new Map([...byHarness].map(([harness, entries]) => {
-      const column = entries.find((cell) => cell.compact) ?? entries[0];
-      const match = matrixMatchedHarnessDelta(cells, column);
-      return [harness, match.delta];
-    }));
+    const rankByHarness = new Map([...byHarness.keys()].map((harness) =>
+      [harness, state.baselineScores?.harnesses.get(harness)?.score]));
     const harnessOrder = [...byHarness.keys()].sort((left, right) => {
       const a = matrixHarnessGroup(left);
       const b = matrixHarnessGroup(right);
@@ -459,7 +402,7 @@ export function createMatrix(state, {
             compareHarnessVersions(right.version ?? "", left.version ?? ""))
         : unique.filter((cell) => cell.compact).slice(0, 1);
     });
-    const series = overall ? [overall, ...harnesses] : harnesses;
+    const series = harnesses;
     const byPosition = new Map(cells.map((cell) => [`${cell.model}\0${cell.columnKey}`, cell]));
     // Selected cells take the colour of their series, in selection order, so a
     // cell and the chip that stands for it read as one thing.
@@ -478,18 +421,6 @@ export function createMatrix(state, {
     for (const seriesCell of series) {
       const th = document.createElement("th");
       th.scope = "col";
-      if (seriesCell.overall) {
-        // One column for every harness of a model, so it is not a harness itself
-        // and has no single harness card to open.
-        th.className = "matrix-overall-head";
-        const label = document.createElement("span");
-        label.className = "matrix-header-label";
-        label.textContent = seriesCell.label;
-        th.append(label);
-        th.title = "Every visible harness of this model, pooled per task";
-        headRow.append(th);
-        continue;
-      }
       const expanded = state.expandedHarnesses.has(seriesCell.harness);
       const group = matrixHarnessGroup(seriesCell.harness);
       const inExpandedGroup = (group === "DeepSeek" || group === "pi-extensions") &&
@@ -568,45 +499,42 @@ export function createMatrix(state, {
       const chosen = position != null;
       td.classList.toggle("selected", chosen);
       if (chosen) td.style.setProperty("--selection-color", COLORS[position % COLORS.length]);
-      const value = cell.paired
-        ? (cell.paired.delta == null ? null : cell.paired.delta * 100)
-        : metric.value(cell);
+      const currentVersion = state.baselineScores?.harnesses.get(cell.harness)?.version;
+      const outdated = state.matrixMetric === "score" && cell.compact && !cell.groupedHarness &&
+        cell.harness !== state.baselineScores?.baselineHarness && currentVersion && cell.version !== currentVersion;
+      const value = cell.baseline ? cell.baseline.score * 100 :
+        cell.unrated || outdated ? null : metric.value(cell);
       const source = cell.runId ? `${cell.label}\nRun: ${cell.runId}` : cell.label;
-      const note = !cell.overall && !cell.compact && rowsForCell(cell).every((row) => !row.fullBenchmark)
+      const note = !cell.compact && rowsForCell(cell).every((row) => !row.fullBenchmark)
         ? "\nPartial benchmark run; excluded from summary scores" : "";
       if (value == null) {
         button.textContent = "—";
         button.classList.add("matrix-value-missing");
-        const coverage = !cell.paired && state.matrixMetric === "score" ? coverageFor(cell) : null;
+        const coverage = !cell.unrated && !outdated && state.matrixMetric === "score" ? coverageFor(cell) : null;
         if (coverage) {
           button.classList.add("matrix-partial-coverage");
           const count = document.createElement("small");
           count.textContent = `${coverage.count}/${coverage.total}`;
           button.append(count);
         }
-        if (cell.paired) {
-          button.classList.add("matrix-paired");
-          const count = document.createElement("small");
-          count.textContent = `${cell.paired.pairs}/3 pairs`;
-          button.append(count);
-        }
-        button.title = `${modelLabel}\n${source}${note}\n${cell.paired
-          ? `${cell.paired.pairs} shared model families; at least 3 needed for a paired score versus pi-default`
+        button.title = `${modelLabel}\n${source}${note}\n${cell.unrated
+          ? "No baseline-adjusted score for this grouped or older harness version"
+          : outdated ? `No full run of latest harness version ${currentVersion} on this route`
           : `${metric.label}: not reported`}` +
           (coverage ? `\nMost complete single run: ${coverage.count}/${coverage.total} tasks` : "") +
           `\n${chosen ? "Selected — click to remove" : "Click to compare"}`;
       } else {
-        button.style.setProperty("--score-color", cell.paired
-          ? (value > 0 ? "var(--green)" : value < 0 ? "var(--red)" : "var(--border-strong)")
-          : scoreColor(relativeQualityPosition(value, low, high, metric.higherIsBetter)));
-        if (cell.paired) {
-          const delta = `${value > 0 ? "+" : ""}${value.toFixed(1)} pp`;
-          button.textContent = delta;
+        button.style.setProperty("--score-color",
+          scoreColor(relativeQualityPosition(value, low, high, metric.higherIsBetter)));
+        if (cell.baseline) {
+          const { delta, covered, total } = cell.baseline;
+          button.textContent = value.toFixed(1);
           button.classList.add("matrix-paired");
           const count = document.createElement("small");
-          count.textContent = `${cell.paired.pairs} pairs`;
+          const points = Math.abs(delta * 100) < 0.05 ? 0 : delta * 100;
+          count.textContent = `${points >= 0 ? "+" : ""}${points.toFixed(1)} pp · ${covered}/${total} routes`;
           button.append(count);
-          button.title = `${modelLabel}\n${source}\n${delta} median score difference versus pi-default across ${cell.paired.pairs} shared model families\n${chosen ? "Selected — click to remove" : "Click to compare"}`;
+          button.title = `${modelLabel}\n${source}\n${value.toFixed(1)} baseline-adjusted mean · ${count.textContent} versus ${state.baselineScores.baselineHarness}\nMissing routes use their own baseline score; click to compare measured routes`;
         } else {
           button.textContent = metric.format(value);
           button.title = `${modelLabel}\n${source}${note}\n${metric.label}: ${metric.format(value)}\n${metric.detail(cell)}\n${chosen ? "Selected — click to remove" : "Click to compare"}`;
@@ -625,25 +553,27 @@ export function createMatrix(state, {
     summaryLabel.className = "matrix-model-column";
     summaryLabel.textContent = "Across all models";
     summaryLabel.title = state.matrixMetric === "score"
-      ? "Median paired score difference from pi-default across at least 3 shared model families"
+      ? `Baseline-adjusted mean across all full ${state.baselineScores?.baselineHarness ?? "pi-default"} model-provider routes; missing results use their route baseline`
       : "Median across model families, with one vote per model";
     summaryRow.append(summaryLabel);
     for (const column of series) {
-      if (column.overall) {
-        const corner = document.createElement("td");
-        corner.className = "matrix-corner";
-        corner.title = "No score: both axes are aggregated";
-        summaryRow.append(corner);
-        continue;
-      }
       const summary = matrixAcrossModels(cells, column, rowsForCell);
       if (summary && state.matrixMetric === "score") {
-        const paired = matrixMatchedHarnessDelta(cells, column);
-        summary.paired = { delta: paired.delta, pairs: paired.pairs };
-        summary.label = `${paired.pairs} matched model families · ${column.label}`;
-        summary.sourceRows = [...new Set(paired.matchedCells.flatMap(rowsForCell))];
-        summary.observations = summary.sourceRows.filter((row) => row.fullBenchmark)
-          .reduce((count, row) => count + row.observations, 0);
+        const members = [...new Set(rowsForCell(column).map((row) => row.harnessFamily))];
+        const harness = column.groupedHarness && members.length === 1 ? members[0] : column.harness;
+        const rating = state.baselineScores?.harnesses.get(harness);
+        const rated = rating && (!column.groupedHarness || members.length === 1) &&
+          (column.compact || column.version === rating.version) &&
+          (harness === state.baselineScores?.baselineHarness ? column.compact : true);
+        summary.unrated = !rated;
+        if (rated) {
+          summary.baseline = rating;
+          summary.harness = harness;
+          summary.score = rating.score;
+          summary.label = `Across ${rating.total} ${state.baselineScores.baselineHarness} routes · ${harness}`;
+          summary.sourceRows = rating.rows;
+          summary.observations = rating.rows.reduce((count, row) => count + row.observations, 0);
+        }
       }
       if (summary) state.matrixCellCache.set(summary.key, summary);
       summaryRow.append(renderValue(summary, "Across all models"));
@@ -694,7 +624,6 @@ export function createMatrix(state, {
       row.append(heading);
       for (const seriesCell of series) {
         const td = renderValue(byPosition.get(`${model}\0${seriesCell.columnKey}`), modelLabel);
-        if (seriesCell.overall) td.classList.add("matrix-overall-column");
         row.append(td);
       }
       body.append(row);
