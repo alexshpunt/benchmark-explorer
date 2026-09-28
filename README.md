@@ -4,7 +4,7 @@ Private source for the public [Benchmark Explorer](https://huggingface.co/spaces
 
 The Space reads accepted, generated views from the public [Explicit Edit Benchmark dataset](https://huggingface.co/datasets/alexshpunt/explicit-edit-benchmark). Never commit credentials or private benchmark payloads here.
 
-Run `npm run build:snapshot` before serving locally. The build resolves the current Dataset commit, pins every file to that revision, checks published SHA-256 digests, and writes `dist/snapshot.json.gz` and `dist/snapshot-manifest.json`. Serve the app files together with these two files at the web root. The deploy workflow builds and publishes them with the Space.
+Run `npm run build:snapshot` before serving locally. The build resolves the current Dataset commit, downloads its single UI-ready `data/explorer-summary.json.gz`, checks the published SHA-256 digest, and writes a content-addressed file under `dist/snapshots/` plus `dist/snapshot-manifest.json`. Serve the app files together with those generated files at the web root. The deploy workflow builds and publishes them with the Space.
 
 Run `npm run preview` to serve the app at `http://127.0.0.1:8768/`. The preview server requests its own root page every minute and logs the response.
 
