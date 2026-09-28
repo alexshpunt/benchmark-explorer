@@ -244,7 +244,13 @@ a:focus-visible,
 }
 
 main {
-  width: 100%;
+  width: 83.333333%;
+  margin-inline: auto;
+}
+@media (max-width: 900px) {
+  main {
+    width: 100%;
+  }
 }
 /* ---------------------------------------------------------------- status bar */
 

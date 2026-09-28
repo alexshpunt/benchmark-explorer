@@ -1,7 +1,8 @@
 /* ------------------------------------------------------------------- footer */
 
 footer {
-  margin: 24px var(--page-pad) 0;
+  width: calc(83.333333% - 2 * var(--page-pad));
+  margin: 24px auto 0;
   padding: 16px 0 28px;
   display: flex;
   justify-content: space-between;
@@ -54,6 +55,7 @@ footer p {
     width: min(300px, calc(100vw - 24px));
   }
   footer {
+    width: auto;
     margin: 20px var(--page-pad) 0;
     flex-direction: column;
     gap: 8px;
