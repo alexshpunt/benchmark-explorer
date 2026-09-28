@@ -6,18 +6,24 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { buildSnapshot, recentRunHighlights } from "../scripts/build-snapshot.mjs";
-import { aggregateLeaderboard, filterSnapshotRunRows, setViewsData } from "../core.mjs";
+import {
+  aggregateLeaderboard,
+  compactToolCalls,
+  expandToolCounts,
+  filterSnapshotRunRows,
+  setViewsData,
+} from "../core.mjs";
 
 const revision = "a".repeat(40);
 const views = { schemaVersion: 1, scoring: { id: "explicit-edit-score", version: 2 },
   leaderboard: [], taskFamilies: {} };
 const summary = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   views,
   profiles: [],
   trials: [],
   rounds: [],
-  toolCalls: [],
+  toolCounts: [{ runId: "run", roundId: "round", tool: "read", calls: 2 }],
 };
 const bytes = Buffer.from(JSON.stringify(summary));
 const compressedSummary = gzipSync(bytes, { level: 6, mtime: 0 });
@@ -48,7 +54,10 @@ test("snapshot pins and verifies dataset files before publishing an artifact", a
     assert.match(manifest.file, /^snapshots\/snapshot\.[a-f0-9]{64}\.json\.gz$/);
     assert.equal(manifest.file, `snapshots/snapshot.${manifest.sha256}.json.gz`);
     assert.equal(createHash("sha256").update(compressed).digest("hex"), manifest.sha256);
-    assert.equal(JSON.parse(gunzipSync(compressed)).revision, revision);
+    const snapshot = JSON.parse(gunzipSync(compressed));
+    assert.equal(snapshot.revision, revision);
+    assert.deepEqual(snapshot.toolCounts, summary.toolCounts);
+    assert.equal(snapshot.toolCalls, undefined);
     assert.deepEqual(requests, ["https://example.org/dataset/resolve/main/dataset-index.json",
       `https://example.org/dataset/resolve/${revision}/data/explorer-summary.json.gz`]);
     await assert.rejects(buildSnapshot({ dataset: "https://example.org/dataset", output,
@@ -59,6 +68,27 @@ test("snapshot pins and verifies dataset files before publishing an artifact", a
         }), { headers: { "x-repo-commit": revision } })
         : new Response(compressedSummary) }), /checksum/);
   } finally { await rm(output, { recursive: true, force: true }); }
+});
+
+test("compact tool counts preserve normalized tool events", () => {
+  const calls = [
+    { runId: "run", roundId: "round", tool: "read" },
+    { runId: "run", roundId: "round", tool: "read" },
+  ];
+  assert.deepEqual(compactToolCalls(calls), [
+    { runId: "run", roundId: "round", tool: "read", calls: 2 },
+  ]);
+  assert.deepEqual(
+    expandToolCounts([{ runId: "run", roundId: "round", tool: "read", calls: 2 }]),
+    [
+      { runId: "run", roundId: "round", tool: "read" },
+      { runId: "run", roundId: "round", tool: "read" },
+    ],
+  );
+  assert.throws(
+    () => expandToolCounts([{ runId: "run", roundId: "round", tool: "read", calls: -1 }]),
+    /Invalid compact tool count/,
+  );
 });
 
 test("recent runs use their dataset acceptance date and median of full scores", () => {

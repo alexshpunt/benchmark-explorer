@@ -6,6 +6,7 @@ import {
   modelRouteLabel,
   normalizeColumnLayout,
   latestHarnessConfigurations,
+  expandToolCounts,
   explorerSearch,
   parseExplorerControls,
   parseExplorerState,
@@ -341,12 +342,48 @@ const { COLUMN_BY_ID, DEFAULT_COLUMN_IDS, DEFAULT_COLUMN_LAYOUT, REQUIRED_COLUMN
   getLeaderboardTableObserver: () => getLeaderboardTableObserver(),
 });
 
+const runEvidenceCache = new Map();
+
+/** Load and verify the immutable detail package for one opened run. */
+async function loadRunEvidence(runId) {
+  if (runEvidenceCache.has(runId)) return runEvidenceCache.get(runId);
+  const pending = (async () => {
+    const file = state.index?.explorerDetails?.[runId];
+    if (!file || !state.revision) throw Error(`Unknown run ${runId}`);
+    const url = `${DATASET_PAGE}/resolve/${state.revision}/${file.path}`;
+    const response = await fetch(url);
+    if (!response.ok) throw Error(`${file.path}: HTTP ${response.status}`);
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    await verifyPublishedBytes(bytes, file.sha256);
+    const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("gzip"));
+    const evidence = JSON.parse(await new Response(stream).text());
+    if (
+      evidence?.schemaVersion !== 1 ||
+      evidence.runId !== runId ||
+      !Array.isArray(evidence.profiles) ||
+      !Array.isArray(evidence.trials) ||
+      !Array.isArray(evidence.rounds) ||
+      !Array.isArray(evidence.toolCalls)
+    ) {
+      throw Error(`Invalid run detail ${runId}`);
+    }
+    return evidence;
+  })();
+  runEvidenceCache.set(runId, pending);
+  try {
+    return await pending;
+  } catch (error) {
+    runEvidenceCache.delete(runId);
+    throw error;
+  }
+}
+
 const { openConfigurationDetails, openRunDetails, openModelDetails, openAgentDetails, openThinkingDetails,
   openHarnessDetails, openTaskFamilyDetails, openTaskDetails, openToolDetails,
   openCellDetails, familyScore, formatNumber, closeOnOutsideClick } = createDetails(state, {
   DATASET_PAGE, percentText, mean, scopeToken, configToken, setCard,
   selectedValues, activeFilters, render, syncUrl, rowsForCell, cellKeyFromRow,
-  COLUMN_BY_ID, pooledFamilyScore: (...args) => pooledFamilyScore(...args),
+  COLUMN_BY_ID, loadRunEvidence, pooledFamilyScore: (...args) => pooledFamilyScore(...args),
 });
 
 const { renderComparison, pooledFamilyScore } = createComparison(state, {
@@ -494,7 +531,8 @@ async function parseSnapshot(manifest, bytes) {
   const snapshot = JSON.parse(await new Response(stream).text());
   if (snapshot.schemaVersion !== 1 || snapshot.revision !== manifest.revision ||
       !Array.isArray(snapshot.runRows?.all) || !Array.isArray(snapshot.recentRuns) ||
-      !Array.isArray(snapshot.trials) || snapshot.trials.length !== manifest.trials)
+      !Array.isArray(snapshot.trials) || snapshot.trials.length !== manifest.trials ||
+      !Array.isArray(snapshot.toolCounts))
     throw Error("Snapshot contents do not match the manifest");
   validateDatasetSnapshot(snapshot.index, snapshot.views);
   return snapshot;
@@ -509,7 +547,7 @@ function installSnapshot(snapshot, freshness) {
   state.profiles = snapshot.profiles;
   state.trials = snapshot.trials;
   state.rounds = snapshot.rounds;
-  state.toolCalls = snapshot.toolCalls;
+  state.toolCalls = expandToolCounts(snapshot.toolCounts);
   const acceptedRunIds = snapshot.index.runs.map((run) => run.runId);
   state.baselineScores = baselineHarnessScores(snapshot.runRows.all, acceptedRunIds, BASELINE_HARNESS);
   state.topGroups = topFiveGroups(snapshot.runRows.all, acceptedRunIds, BASELINE_HARNESS);

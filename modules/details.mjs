@@ -8,7 +8,7 @@ import { compactVersion } from "./comparison.mjs";
 export function createDetails(state, {
   DATASET_PAGE, percentText, mean, scopeToken, configToken, setCard,
   selectedValues, activeFilters, render, syncUrl, rowsForCell, cellKeyFromRow,
-  COLUMN_BY_ID, pooledFamilyScore,
+  COLUMN_BY_ID, loadRunEvidence, pooledFamilyScore,
 }) {
   function formatNumber(value, decimals) {
     return decimals ? value.toFixed(decimals) : Math.round(value).toLocaleString();
@@ -577,16 +577,67 @@ export function createDetails(state, {
   }
 
   /** A published run, including configurations hidden by the current filters. */
-  function openRunDetails(runId) {
+  async function openRunDetails(runId) {
     const run = state.index?.runs?.find((entry) => entry.runId === runId);
     const rows = state.snapshot?.runRows?.all?.filter((row) => row.runId === runId) ?? [];
     if (!run || !rows.length) return;
-    openDetailsDialog(`Run: ${runId}`, `${rows.length} configurations · ${run.counts.trials.toLocaleString()} trials`, [
+    const card = `run:${runId}`;
+    const subtitle = `${rows.length} configurations · ${run.counts.trials.toLocaleString()} trials`;
+    const loading = detailsSection("Run evidence");
+    const loadingText = document.createElement("p");
+    loadingText.textContent = "Loading this run’s verified rounds and tool calls…";
+    loading.append(loadingText);
+    openDetailsDialog(`Run: ${runId}`, subtitle, [
       configurationListSection(rows, "Configurations in this run"),
       taskOutcomeSection(rows),
+      loading,
       provenanceSection(rows),
     ]);
-    setCard(`run:${runId}`);
+    setCard(card);
+    try {
+      const evidence = await loadRunEvidence(runId);
+      if (state.card !== card) return;
+      const tools = new Map();
+      for (const call of evidence.toolCalls) {
+        if (call.tool) tools.set(call.tool, (tools.get(call.tool) ?? 0) + 1);
+      }
+      const evidenceSection = detailsSection("Verified run evidence");
+      evidenceSection.append(
+        detailList([
+          ["Profiles", evidence.profiles.length.toLocaleString()],
+          ["Trials", evidence.trials.length.toLocaleString()],
+          ["Rounds", evidence.rounds.length.toLocaleString()],
+          ["Tool calls", evidence.toolCalls.length.toLocaleString()],
+          [
+            "Most used tools",
+            [...tools]
+              .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
+              .slice(0, 5)
+              .map(([tool, calls]) => `${tool} (${calls.toLocaleString()})`)
+              .join(", ") || "—",
+          ],
+        ]),
+      );
+      openDetailsDialog(`Run: ${runId}`, subtitle, [
+        configurationListSection(rows, "Configurations in this run"),
+        taskOutcomeSection(rows),
+        evidenceSection,
+        provenanceSection(rows),
+      ]);
+    } catch (error) {
+      if (state.card !== card) return;
+      const failure = detailsSection("Run evidence unavailable");
+      const message = document.createElement("p");
+      message.textContent = "The run’s detailed files could not be verified. Try again later.";
+      failure.append(message);
+      openDetailsDialog(`Run: ${runId}`, subtitle, [
+        configurationListSection(rows, "Configurations in this run"),
+        taskOutcomeSection(rows),
+        failure,
+        provenanceSection(rows),
+      ]);
+      console.error(error);
+    }
   }
   /** One model route: every visible configuration it ran, plus its task outcomes. */
   function openModelDetails(route) {
