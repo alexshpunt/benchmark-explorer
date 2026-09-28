@@ -1,15 +1,13 @@
 #results-grid {
-  /* Fit the visible columns; extra columns scroll inside this centered region. */
-  width: fit-content;
-  max-width: calc(100% - 2 * var(--page-pad));
+  width: 100%;
   max-height: min(calc(21 * var(--row-height) + 2px), 65vh);
-  margin-inline: auto;
   overflow: auto;
+  padding-inline: var(--page-pad);
   background: transparent;
 }
 .gridjs-container {
   width: max-content !important;
-  min-width: 0 !important;
+  min-width: 100% !important;
   color: inherit !important;
 }
 .gridjs-head,
@@ -18,7 +16,7 @@
 }
 .gridjs-wrapper {
   width: max-content !important;
-  min-width: 0 !important;
+  min-width: 100% !important;
   overflow: visible !important;
   border: 0 !important;
   box-shadow: none !important;
@@ -26,7 +24,7 @@
 .gridjs-table,
 .results-table-table {
   width: max-content !important;
-  min-width: 0 !important;
+  min-width: 100% !important;
   table-layout: auto !important;
   /* Separate borders keep the sticky header border visible while scrolling. */
   border-collapse: separate !important;
