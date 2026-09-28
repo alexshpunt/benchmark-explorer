@@ -5,7 +5,6 @@ import { resolve } from "node:path";
 import {
   aggregateRunConfigurations,
   datasetRevision,
-  parseJsonLines,
   pinnedDatasetRoot,
   markFullBenchmarkRows,
   median,
@@ -79,28 +78,25 @@ export async function buildSnapshot({ dataset = "https://huggingface.co/datasets
     await verifyPublishedBytes(bytes, file.sha256);
     return bytes;
   };
-  const views = JSON.parse(new TextDecoder().decode(await checked(index.views)));
-  validateDatasetSnapshot(index, views);
-  const evidence = { profiles: [], trials: [], rounds: [], toolCalls: [] };
-  const fields = {
-    profiles: ["runId", "profileId", "agentFamily", "agentVersion", "harnessFamily", "harnessId", "harnessVersion", "modelFamily", "modelId", "model", "modelVersion", "provider", "configurationHash", "transport", "harnessKind", "adapterVersion", "configurationLabels", "thinking"],
-    trials: ["runId", "trialId", "profileId", "taskId", "rounds", "firstExactPassed", "finalExactPassed"],
-    rounds: ["runId", "roundId", "trialId", "seconds", "costUsd", "totalTokens"],
-    toolCalls: ["runId", "roundId", "tool"],
-  };
-  for (let position = 0; position < index.runs.length; position += 5) {
-    console.log(`Building snapshot: ${position}/${index.runs.length} runs`);
-    const batch = await Promise.all(index.runs.slice(position, position + 5).map(async (run) =>
-      Promise.all([["profiles", "profiles"], ["trials", "trials"],
-        ["rounds", "rounds"], ["tool-calls", "toolCalls"]].map(async ([table, key]) => {
-        const bytes = await checked(run.files[table]);
-        return [key, parseJsonLines(gunzipSync(bytes).toString("utf8"))];
-      }))));
-    for (const run of batch) for (const [key, rows] of run) {
-      evidence[key].push(...rows.map((row) => Object.fromEntries(
-        fields[key].filter((field) => row[field] !== undefined).map((field) => [field, row[field]]))));
-    }
+  if (!index.explorerSummary) throw Error("Dataset does not publish an Explorer summary");
+  const summary = JSON.parse(gunzipSync(await checked(index.explorerSummary)).toString("utf8"));
+  if (
+    summary?.schemaVersion !== 1 ||
+    !Array.isArray(summary.profiles) ||
+    !Array.isArray(summary.trials) ||
+    !Array.isArray(summary.rounds) ||
+    !Array.isArray(summary.toolCalls)
+  ) {
+    throw Error("Unsupported Dataset Explorer summary");
   }
+  const views = summary.views;
+  validateDatasetSnapshot(index, views);
+  const evidence = {
+    profiles: summary.profiles,
+    trials: summary.trials,
+    rounds: summary.rounds,
+    toolCalls: summary.toolCalls,
+  };
   const families = [...new Set(evidence.trials.map((trial) => taskFamily(trial.taskId)))];
   const runRows = { all: aggregateRunConfigurations(index, evidence.profiles, evidence.trials, evidence.rounds) };
   for (const family of families) runRows[family] = aggregateRunConfigurations(

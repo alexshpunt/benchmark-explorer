@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash, webcrypto } from "node:crypto";
-import { gunzipSync } from "node:zlib";
+import { gunzipSync, gzipSync } from "node:zlib";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -11,9 +11,23 @@ import { aggregateLeaderboard, filterSnapshotRunRows, setViewsData } from "../co
 const revision = "a".repeat(40);
 const views = { schemaVersion: 1, scoring: { id: "explicit-edit-score", version: 2 },
   leaderboard: [], taskFamilies: {} };
-const bytes = Buffer.from(JSON.stringify(views));
-const digest = createHash("sha256").update(bytes).digest("hex");
-const index = { schemaVersion: 1, runs: [], views: { path: "views.json", sha256: digest } };
+const summary = {
+  schemaVersion: 1,
+  views,
+  profiles: [],
+  trials: [],
+  rounds: [],
+  toolCalls: [],
+};
+const bytes = Buffer.from(JSON.stringify(summary));
+const compressedSummary = gzipSync(bytes, { level: 6, mtime: 0 });
+const digest = createHash("sha256").update(compressedSummary).digest("hex");
+const index = {
+  schemaVersion: 1,
+  runs: [],
+  views: { path: "views.json", sha256: "b".repeat(64) },
+  explorerSummary: { path: "data/explorer-summary.json.gz", sha256: digest },
+};
 
 test("snapshot pins and verifies dataset files before publishing an artifact", async () => {
   globalThis.crypto ??= webcrypto;
@@ -24,7 +38,7 @@ test("snapshot pins and verifies dataset files before publishing an artifact", a
     requests.push(path);
     if (path.endsWith("dataset-index.json")) return new Response(JSON.stringify(index),
       { headers: { "x-repo-commit": revision } });
-    return new Response(bytes);
+    return new Response(compressedSummary);
   };
   try {
     await buildSnapshot({ dataset: "https://example.org/dataset", output, fetcher });
@@ -36,11 +50,14 @@ test("snapshot pins and verifies dataset files before publishing an artifact", a
     assert.equal(createHash("sha256").update(compressed).digest("hex"), manifest.sha256);
     assert.equal(JSON.parse(gunzipSync(compressed)).revision, revision);
     assert.deepEqual(requests, ["https://example.org/dataset/resolve/main/dataset-index.json",
-      `https://example.org/dataset/resolve/${revision}/views.json`]);
+      `https://example.org/dataset/resolve/${revision}/data/explorer-summary.json.gz`]);
     await assert.rejects(buildSnapshot({ dataset: "https://example.org/dataset", output,
       fetcher: async (url) => String(url).endsWith("dataset-index.json")
-        ? new Response(JSON.stringify({ ...index, views: { ...index.views, sha256: "0".repeat(64) } }),
-          { headers: { "x-repo-commit": revision } }) : new Response(bytes) }), /checksum/);
+        ? new Response(JSON.stringify({
+          ...index,
+          explorerSummary: { ...index.explorerSummary, sha256: "0".repeat(64) },
+        }), { headers: { "x-repo-commit": revision } })
+        : new Response(compressedSummary) }), /checksum/);
   } finally { await rm(output, { recursive: true, force: true }); }
 });
 
