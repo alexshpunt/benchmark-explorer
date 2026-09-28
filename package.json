@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "check": "node --check app.mjs && node --check core.mjs && for file in modules/*.mjs; do node --check \"$file\" || exit; done && node --check scripts/build-snapshot.mjs && node --test test/*.test.mjs",
-    "build:snapshot": "node scripts/build-snapshot.mjs"
+    "build:snapshot": "node scripts/build-snapshot.mjs",
+    "preview": "python3 scripts/serve-preview.py"
   }
 }
