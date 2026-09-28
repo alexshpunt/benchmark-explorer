@@ -40,7 +40,7 @@ jobs:
           build=true
           if [[ "$EVENT_NAME" == "schedule" ]]; then
             published=$(curl --fail --silent --show-error \
-              https://alexshpunt-benchmark-explorer.hf.space/snapshot-manifest.json \
+              https://alexshpunt-benchmark-explorer.static.hf.space/snapshot-manifest.json \
               | jq --raw-output '.revision // empty') || published=""
             if [[ "$published" == "$revision" ]]; then
               build=false
@@ -87,7 +87,7 @@ jobs:
           set -euo pipefail
           for attempt in {1..20}; do
             published=$(curl --fail --silent --show-error \
-              https://alexshpunt-benchmark-explorer.hf.space/snapshot-manifest.json \
+              https://alexshpunt-benchmark-explorer.static.hf.space/snapshot-manifest.json \
               | jq --raw-output '.revision // empty') || published=""
             [[ "$published" == "$EXPECTED_REVISION" ]] && exit 0
             sleep 6
