@@ -4,6 +4,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import {
   aggregateRunConfigurations,
+  compactToolCalls,
   datasetRevision,
   pinnedDatasetRoot,
   markFullBenchmarkRows,
@@ -80,12 +81,14 @@ export async function buildSnapshot({ dataset = "https://huggingface.co/datasets
   };
   if (!index.explorerSummary) throw Error("Dataset does not publish an Explorer summary");
   const summary = JSON.parse(gunzipSync(await checked(index.explorerSummary)).toString("utf8"));
+  const validTools =
+    (summary?.schemaVersion === 1 && Array.isArray(summary.toolCalls)) ||
+    (summary?.schemaVersion === 2 && Array.isArray(summary.toolCounts));
   if (
-    summary?.schemaVersion !== 1 ||
+    !validTools ||
     !Array.isArray(summary.profiles) ||
     !Array.isArray(summary.trials) ||
-    !Array.isArray(summary.rounds) ||
-    !Array.isArray(summary.toolCalls)
+    !Array.isArray(summary.rounds)
   ) {
     throw Error("Unsupported Dataset Explorer summary");
   }
@@ -95,7 +98,9 @@ export async function buildSnapshot({ dataset = "https://huggingface.co/datasets
     profiles: summary.profiles,
     trials: summary.trials,
     rounds: summary.rounds,
-    toolCalls: summary.toolCalls,
+    toolCounts: summary.schemaVersion === 2
+      ? summary.toolCounts
+      : compactToolCalls(summary.toolCalls),
   };
   const families = [...new Set(evidence.trials.map((trial) => taskFamily(trial.taskId)))];
   const runRows = { all: aggregateRunConfigurations(index, evidence.profiles, evidence.trials, evidence.rounds) };

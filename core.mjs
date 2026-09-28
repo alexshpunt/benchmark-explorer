@@ -140,6 +140,44 @@ export function setViewsData(data) {
   precomputedViews = data;
 }
 
+/** Collapse normalized tool events for transfer without changing their counts. */
+export function compactToolCalls(toolCalls) {
+  const counts = new Map();
+  for (const call of toolCalls) {
+    if (!call.runId || !call.roundId || !call.tool) continue;
+    const key = JSON.stringify([call.runId, call.roundId, call.tool]);
+    const current = counts.get(key) ?? {
+      runId: call.runId,
+      roundId: call.roundId,
+      tool: call.tool,
+      calls: 0,
+    };
+    current.calls += 1;
+    counts.set(key, current);
+  }
+  return [...counts.values()];
+}
+
+/** Expand compact tool counters into the normalized events used by interactive calculations. */
+export function expandToolCounts(toolCounts) {
+  return toolCounts.flatMap((entry) => {
+    if (
+      typeof entry.runId !== "string" ||
+      typeof entry.roundId !== "string" ||
+      typeof entry.tool !== "string" ||
+      !Number.isSafeInteger(entry.calls) ||
+      entry.calls < 0
+    ) {
+      throw Error("Invalid compact tool count");
+    }
+    return Array.from({ length: entry.calls }, () => ({
+      runId: entry.runId,
+      roundId: entry.roundId,
+      tool: entry.tool,
+    }));
+  });
+}
+
 /** Parse newline-delimited JSON, ignoring blank lines. */
 export function parseJsonLines(text) {
   return text

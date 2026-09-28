@@ -22,6 +22,6 @@ In the Score matrix, Across all models shows the baseline-adjusted mean for each
 
 Matrix scores and other measured summaries use only complete benchmark runs. In Score, a cell without a complete run shows a dash and the most complete single run's task count against the published benchmark total (currently 226). Partial runs remain available in details and comparisons, but their scores and measurements do not enter the summaries.
 
-The browser loads only this checked snapshot. It does not fetch individual run shards. The snapshot contains accepted Dataset views, pre-aggregated run configurations and the compact trial evidence needed for interactive filters, comparisons and tool details. Scores and exclusions still come from the accepted Dataset views; the Space does not edit accepted data.
+The browser loads one checked snapshot for the leaderboard, matrix, filters, comparisons, and charts. Tool events are transferred as compact counters and expanded locally, so ordinary interaction does not fetch run shards. Opening a run loads only that run’s profiles, trials, rounds, and tool calls from the pinned Dataset revision, verifies every published checksum, and caches the result for the page session. Scores and exclusions still come from the accepted Dataset views; the Space does not edit accepted data.
 
 Harness card links may use `card=harness:FAMILY@latest`. The Explorer resolves `latest` to the highest accepted semantic version for that harness family.
