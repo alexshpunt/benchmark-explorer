@@ -712,7 +712,10 @@ export function createLeaderboard(state, {
   /** Truncated cells keep their full value available on hover. */
   function addOverflowTitles(host) {
     for (const cell of host.querySelectorAll("tbody td")) {
-      if (cell.scrollWidth > cell.clientWidth + 1) cell.title = cell.textContent?.trim() ?? "";
+      const button = cell.querySelector(".cell-detail");
+      if (button && button.scrollWidth > button.clientWidth + 1) {
+        button.title = button.textContent?.trim() ?? "";
+      }
     }
   }
 

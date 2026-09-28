@@ -1,17 +1,15 @@
 #results-grid {
-  width: 100%;
-  /* Keep wide columns inside the leaderboard instead of widening the whole page. */
-  overflow-x: auto;
-  max-height: calc(21 * var(--row-height) + 2px);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  /* Same inset as every other block, so the table lines up with the page. */
-  padding-inline: var(--page-pad);
+  /* Fit the visible columns; extra columns scroll inside this centered region. */
+  width: fit-content;
+  max-width: calc(100% - 2 * var(--page-pad));
+  max-height: min(calc(21 * var(--row-height) + 2px), 65vh);
+  margin-inline: auto;
+  overflow: auto;
   background: transparent;
 }
 .gridjs-container {
   width: max-content !important;
-  min-width: 100% !important;
+  min-width: 0 !important;
   color: inherit !important;
 }
 .gridjs-head,
@@ -20,7 +18,7 @@
 }
 .gridjs-wrapper {
   width: max-content !important;
-  min-width: 100% !important;
+  min-width: 0 !important;
   overflow: visible !important;
   border: 0 !important;
   box-shadow: none !important;
@@ -28,7 +26,7 @@
 .gridjs-table,
 .results-table-table {
   width: max-content !important;
-  min-width: 100% !important;
+  min-width: 0 !important;
   table-layout: auto !important;
   /* Separate borders keep the sticky header border visible while scrolling. */
   border-collapse: separate !important;
@@ -118,11 +116,26 @@
 .gridjs-td[data-column-id="score"] {
   font-weight: 600;
 }
+.gridjs-th[data-column-id="model"],
+.gridjs-td[data-column-id="model"] {
+  width: 20rem;
+  max-width: 20rem;
+}
+.gridjs-th[data-column-id="agent"],
+.gridjs-td[data-column-id="agent"] {
+  width: 22rem;
+  max-width: 22rem;
+}
 .gridjs-td[data-column-id="model"],
 .gridjs-td[data-column-id="agent"] {
-  max-width: 24rem;
+  overflow: hidden;
+}
+.gridjs-td .cell-detail {
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
 }
 .gridjs-th[draggable="true"] {
   cursor: grab;
