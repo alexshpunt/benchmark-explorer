@@ -16,6 +16,14 @@ import {
   relativeQualityPosition,
   toolTrialCounts,
 } from "../core.mjs";
+import { DEFAULT_HIDDEN_IDS } from "../modules/leaderboard.mjs";
+
+test("compact leaderboard defaults keep identities, score and total usage visible", () => {
+  const visible = ["#", "score", "model", "agent", "totalCost($)", "totalTokens"];
+  const all = [...visible, ...DEFAULT_HIDDEN_IDS];
+  const layout = normalizeColumnLayout(all, { version: 1, order: all, hidden: DEFAULT_HIDDEN_IDS }, ["model"]);
+  assert.deepEqual(layout.order.filter((id) => !layout.hidden.includes(id)), visible);
+});
 
 const columns = ["#", "score", "model", "provider", "avgCost($)", "avgTokens"];
 

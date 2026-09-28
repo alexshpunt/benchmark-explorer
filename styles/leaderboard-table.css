@@ -2,6 +2,9 @@
   width: 100%;
   /* Keep wide columns inside the leaderboard instead of widening the whole page. */
   overflow-x: auto;
+  max-height: calc(21 * var(--row-height) + 2px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   /* Same inset as every other block, so the table lines up with the page. */
   padding-inline: var(--page-pad);
   background: transparent;
@@ -115,8 +118,9 @@
 .gridjs-td[data-column-id="score"] {
   font-weight: 600;
 }
-.gridjs-td[data-column-id="model"] {
-  max-width: 15rem;
+.gridjs-td[data-column-id="model"],
+.gridjs-td[data-column-id="agent"] {
+  max-width: 24rem;
   overflow: hidden;
   text-overflow: ellipsis;
 }

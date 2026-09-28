@@ -1,8 +1,14 @@
 import {
-  canonicalModelFamily, modelRouteIdentity, modelRouteLabel,
+  canonicalModelFamily, modelRouteIdentity,
   moveColumn, normalizeColumnLayout,
 } from "../core.mjs";
 import { Grid, h } from "../vendor/gridjs-6.2.0.mjs";
+
+/** Optional leaderboard columns hidden until a reader enables them in Columns. */
+export const DEFAULT_HIDDEN_IDS = [
+  "trials", "provider", "harness", "harnessVersion", "thinking", "coverage",
+  "firstExact(%)", "finalExact(%)", "recoveryGain", "avgSeconds", "avgCost($)", "avgTokens",
+];
 
 /** Create leaderboard columns, layout controls and table renderer. */
 export function createLeaderboard(state, {
@@ -88,9 +94,9 @@ export function createLeaderboard(state, {
     },
     {
       id: "model",
-      name: "Model route",
-      tooltip: "Model family and provider. Select a route to inspect its statistics and sources.",
-      cell: modelRouteLabel,
+      name: "Provider / model route / reasoning",
+      tooltip: "Provider, model family and reasoning level. Select the route to inspect its sources.",
+      cell: (row) => `${row.provider ?? "unknown"} / ${canonicalModelFamily(row.modelFamily)} / ${row.thinking ?? "—"}`,
       open: (row) => openModelDetails(modelRouteIdentity(row)),
       detail: {
         lines: [
@@ -121,14 +127,19 @@ export function createLeaderboard(state, {
     },
     {
       id: "agent",
-      name: "Agent",
-      tooltip: "Agent or CLI that drove the model. Select a name to inspect its statistics.",
-      cell: (row) => row.agentFamily,
+      name: "Agent / harness / version",
+      tooltip: "Agent, harness and published version. Select to inspect this configuration.",
+      cell: (row) => `${row.agentFamily} / ${row.harnessFamily} / ${row.harnessVersion ?? "—"}`,
+      open: (row) => openHarnessDetails(row.harnessFamily, row.harnessVersion),
       detail: {
         lines: [
           "The agent is the client that talked to the model. Comparing agents separates model quality from prompt and control-loop design.",
         ],
-        inputs: (row) => [["Agent version", row.agentVersion ?? "—"]],
+        inputs: (row) => [
+          ["Agent version", row.agentVersion ?? "—"],
+          ["Harness", row.harnessFamily],
+          ["Harness version", row.harnessVersion ?? "—"],
+        ],
         identity: (row) => row.agentFamily,
         filter: { name: "agent", value: (row) => row.agentFamily },
       },
@@ -423,10 +434,11 @@ export function createLeaderboard(state, {
 
   const COLUMN_BY_ID = new Map(COLUMNS.map((column) => [column.id, column]));
   const DEFAULT_COLUMN_IDS = COLUMNS.map((column) => column.id);
+  const DEFAULT_COLUMN_LAYOUT = { version: 1, order: DEFAULT_COLUMN_IDS, hidden: DEFAULT_HIDDEN_IDS };
   const REQUIRED_COLUMN_IDS = ["model"];
   state.columnLayout = normalizeColumnLayout(
     DEFAULT_COLUMN_IDS,
-    readPreference(LEADERBOARD_LAYOUT_KEY),
+    readPreference(LEADERBOARD_LAYOUT_KEY) ?? DEFAULT_COLUMN_LAYOUT,
     REQUIRED_COLUMN_IDS,
   );
 
@@ -704,5 +716,5 @@ export function createLeaderboard(state, {
     }
   }
 
-  return { COLUMN_BY_ID, DEFAULT_COLUMN_IDS, REQUIRED_COLUMN_IDS, saveColumnLayout, clearColumnDropIndicators, showColumnDropIndicator, moveLeaderboardColumn, applyLeaderboardColumnLayout, renderColumnSettings, renderResultsTable, addOverflowTitles };
+  return { COLUMN_BY_ID, DEFAULT_COLUMN_IDS, DEFAULT_COLUMN_LAYOUT, REQUIRED_COLUMN_IDS, saveColumnLayout, clearColumnDropIndicators, showColumnDropIndicator, moveLeaderboardColumn, applyLeaderboardColumnLayout, renderColumnSettings, renderResultsTable, addOverflowTitles };
 }

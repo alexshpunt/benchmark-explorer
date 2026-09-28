@@ -326,7 +326,7 @@ function percentText(value) {
 }
 
 const pareto = createPareto(state, toggleSelection);
-const { COLUMN_BY_ID, DEFAULT_COLUMN_IDS, REQUIRED_COLUMN_IDS, saveColumnLayout,
+const { COLUMN_BY_ID, DEFAULT_COLUMN_IDS, DEFAULT_COLUMN_LAYOUT, REQUIRED_COLUMN_IDS, saveColumnLayout,
   clearColumnDropIndicators, showColumnDropIndicator, moveLeaderboardColumn, applyLeaderboardColumnLayout,
   renderColumnSettings, renderResultsTable, addOverflowTitles } = createLeaderboard(state, {
   mean, percentText, readPreference, writePreference, LEADERBOARD_LAYOUT_KEY,
@@ -620,7 +620,7 @@ document.querySelector("#matrix-metric").addEventListener("change", (event) => {
 });
 
 document.querySelector("#reset-columns").addEventListener("click", () => {
-  state.columnLayout = normalizeColumnLayout(DEFAULT_COLUMN_IDS, null, REQUIRED_COLUMN_IDS);
+  state.columnLayout = normalizeColumnLayout(DEFAULT_COLUMN_IDS, DEFAULT_COLUMN_LAYOUT, REQUIRED_COLUMN_IDS);
   saveColumnLayout();
   renderColumnSettings();
   applyLeaderboardColumnLayout();
