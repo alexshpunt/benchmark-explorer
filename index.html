@@ -67,29 +67,6 @@
           </section>
         </div>
       </header>
-      <section class="summary-leaderboards" aria-labelledby="summary-leaderboards-title">
-        <div class="summary-leaderboards-heading">
-          <div>
-            <h2 id="summary-leaderboards-title">Leaderboards</h2>
-            <p>Full runs only. Each model–harness pair uses its latest available harness version.</p>
-          </div>
-          <div class="summary-tabs" role="tablist" aria-label="Leaderboard view">
-            <button type="button" role="tab" data-summary-tab="combinations" aria-controls="summary-combinations" aria-selected="true">Model + harness</button>
-            <button type="button" role="tab" data-summary-tab="models" aria-controls="summary-models" aria-selected="false" tabindex="-1">Models</button>
-            <button type="button" role="tab" data-summary-tab="harnesses" aria-controls="summary-harnesses" aria-selected="false" tabindex="-1">Harnesses</button>
-          </div>
-        </div>
-        <p class="summary-method">Combination score is the median of its runs. Model and harness scores are medians of combination scores.</p>
-        <div id="summary-combinations" class="summary-table-panel" role="tabpanel" data-summary-panel="combinations">
-          <div data-summary-grid="combinations"></div>
-        </div>
-        <div id="summary-models" class="summary-table-panel" role="tabpanel" data-summary-panel="models" hidden>
-          <div data-summary-grid="models"></div>
-        </div>
-        <div id="summary-harnesses" class="summary-table-panel" role="tabpanel" data-summary-panel="harnesses" hidden>
-          <div data-summary-grid="harnesses"></div>
-        </div>
-      </section>
       <section class="explorer-toolbar" aria-label="Explorer controls">
         <div class="view-actions">
           <a
@@ -119,6 +96,29 @@
         </div>
       </section>
 
+      <section class="summary-leaderboards" aria-labelledby="summary-leaderboards-title">
+        <div class="summary-leaderboards-heading">
+          <div>
+            <h2 id="summary-leaderboards-title">Leaderboards</h2>
+            <p>Full runs only. Each model–harness pair uses its latest available harness version.</p>
+          </div>
+          <div class="summary-tabs" role="tablist" aria-label="Leaderboard view">
+            <button type="button" role="tab" data-summary-tab="combinations" aria-controls="summary-combinations" aria-selected="true">Model + harness</button>
+            <button type="button" role="tab" data-summary-tab="models" aria-controls="summary-models" aria-selected="false" tabindex="-1">Models</button>
+            <button type="button" role="tab" data-summary-tab="harnesses" aria-controls="summary-harnesses" aria-selected="false" tabindex="-1">Harnesses</button>
+          </div>
+        </div>
+        <p class="summary-method">Combination score is the median of its runs. Model and harness scores are medians of combination scores.</p>
+        <div id="summary-combinations" class="summary-table-panel" role="tabpanel" data-summary-panel="combinations">
+          <div data-summary-grid="combinations"></div>
+        </div>
+        <div id="summary-models" class="summary-table-panel" role="tabpanel" data-summary-panel="models" hidden>
+          <div data-summary-grid="models"></div>
+        </div>
+        <div id="summary-harnesses" class="summary-table-panel" role="tabpanel" data-summary-panel="harnesses" hidden>
+          <div data-summary-grid="harnesses"></div>
+        </div>
+      </section>
       <section class="status-bar" aria-label="Dataset error" hidden>
         <span class="status-badge">
           <span class="status-dot" aria-hidden="true"></span>

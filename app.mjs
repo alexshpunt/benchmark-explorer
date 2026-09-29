@@ -428,6 +428,7 @@ function render() {
     activeFilters(),
   ));
   const runRows = filterSnapshotRunRows(state.snapshot, activeFilters());
+  renderSummaryLeaderboards(runRows);
   const compactRows = latestHarnessConfigurations(
     runRows,
     state.index.runs.map((run) => run.runId),
@@ -576,7 +577,6 @@ function installSnapshot(snapshot, freshness) {
   state.toolCalls = expandToolCounts(snapshot.toolCounts);
   const acceptedRunIds = snapshot.index.runs.map((run) => run.runId);
   state.baselineScores = baselineHarnessScores(snapshot.runRows.all, acceptedRunIds, BASELINE_HARNESS);
-  renderSummaryLeaderboards(snapshot.runRows.all);
   renderRecentRuns();
   hideLoader();
   render();

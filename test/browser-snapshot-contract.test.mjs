@@ -30,11 +30,14 @@ test("published page includes every split browser asset", async () => {
 
 test("summary and run tables keep their intended page order", async () => {
   const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
+  const toolbar = html.indexOf('class="explorer-toolbar"');
+  const summary = html.indexOf('class="summary-leaderboards"');
   const combinations = html.indexOf('data-summary-tab="combinations"');
   const models = html.indexOf('data-summary-tab="models"');
   const matrix = html.indexOf('class="summary-row"');
   const pareto = html.indexOf('class="pareto-panel"');
   const runs = html.indexOf('id="results-view"');
+  assert.ok(toolbar >= 0 && toolbar < summary);
   assert.ok(combinations >= 0 && combinations < models);
   assert.match(html, /data-summary-tab="combinations"[^>]*aria-selected="true"/);
   assert.ok(matrix >= 0 && matrix < pareto && pareto < runs);

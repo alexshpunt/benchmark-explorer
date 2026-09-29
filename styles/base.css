@@ -295,18 +295,18 @@ main {
 
 .explorer-toolbar {
   position: sticky;
-  top: 10px;
+  top: 0;
   z-index: 20;
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 16px;
-  width: fit-content;
-  max-width: calc(100% - 2 * var(--page-pad));
-  margin: 12px var(--page-pad);
-  margin-left: auto;
-  padding: 8px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+  box-sizing: border-box;
+  width: 100vw;
+  max-width: none;
+  margin: 0 0 12px calc(50% - 50vw);
+  padding: 8px max(var(--page-pad), calc((100vw - 83.333333vw) / 2 + var(--page-pad)));
+  border-block: 1px solid var(--border);
   background: color-mix(in srgb, var(--surface) 94%, transparent);
   box-shadow: 0 8px 24px color-mix(in srgb, var(--text) 10%, transparent);
   backdrop-filter: blur(12px);
