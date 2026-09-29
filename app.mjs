@@ -22,7 +22,7 @@ import { createDetails } from "./modules/details.mjs";
 import { createComparison } from "./modules/comparison.mjs";
 import { createMatrix } from "./modules/matrix.mjs";
 import { createPareto } from "./modules/pareto.mjs";
-import { topFiveGroups, renderTopFive } from "./modules/top-five.mjs";
+import { createSummaryLeaderboards } from "./modules/summary-leaderboards.mjs";
 import { baselineHarnessScores } from "./modules/baseline-score.mjs";
 
 /** Public home of the accepted data, and the base for every provenance link. */
@@ -108,10 +108,7 @@ const state = {
   filterCategory: /** @type {string | null} */ (null),
   /** Matrix value shown at each model-route and harness intersection. */
   matrixMetric: initialMatrixMetric,
-  topSort: ["score", "cost", "balance"].includes(initialParams.get("topSort"))
-    ? initialParams.get("topSort") : "score",
   paretoX: initialParams.get("paretoX") === "tokens" ? "tokens" : "cost",
-  topGroups: null,
   baselineScores: null,
   /** Harness families whose individual versions are visible in the matrix. */
   expandedHarnesses: new Set(initialControls.expandedHarnesses),
@@ -188,7 +185,6 @@ function currentSearch() {
   for (const model of [...state.expandedModels].sort()) params.append("expandModel", model);
   for (const group of [...state.expandedMatrixGroups].sort()) params.append("expandGroup", group);
   for (const selection of state.selected) params.append("select", selection);
-  if (state.topSort !== "score") params.set("topSort", state.topSort);
   if (state.paretoX !== "cost") params.set("paretoX", state.paretoX);
   if (initialParams.get("testRuns") === "50") params.set("testRuns", "50");
   if (state.card) params.set("card", state.card);
@@ -387,6 +383,8 @@ const { openConfigurationDetails, openRunDetails, openModelDetails, openAgentDet
   COLUMN_BY_ID, loadRunEvidence, pooledFamilyScore: (...args) => pooledFamilyScore(...args),
 });
 
+const renderSummaryLeaderboards = createSummaryLeaderboards(openConfigurationDetails);
+
 const { renderComparison, pooledFamilyScore } = createComparison(state, {
   mean, COLORS, rowsForCell, cellKeyFromRow, familyScore, activeFilters,
   openConfigurationDetails, openTaskFamilyDetails, openToolDetails,
@@ -453,24 +451,6 @@ function render() {
   );
 }
 
-function topFiveHref(kind, name) {
-  const search = explorerSearch({}, {
-    filters: { [kind === "models" ? "model" : "harness"]: [name] },
-  });
-  const url = new URL(search, location.href);
-  const metric = new URLSearchParams(location.search).get("metric");
-  if (metric) url.searchParams.set("metric", metric);
-  if (state.topSort !== "score") url.searchParams.set("topSort", state.topSort);
-  const theme = new URLSearchParams(location.search).get("__theme");
-  if (theme) url.searchParams.set("__theme", theme);
-  url.hash = "matrix-title";
-  return url.href;
-}
-
-function updateTopFive() {
-  document.querySelector("#top-five-sort").value = state.topSort;
-  if (state.topGroups) renderTopFive(state.topGroups, state.topSort, topFiveHref);
-}
 function renderRecentRuns() {
   document.querySelector("#header-run-count").textContent = state.index.runs.length.toLocaleString();
   const list = document.querySelector("#recent-runs");
@@ -596,8 +576,7 @@ function installSnapshot(snapshot, freshness) {
   state.toolCalls = expandToolCounts(snapshot.toolCounts);
   const acceptedRunIds = snapshot.index.runs.map((run) => run.runId);
   state.baselineScores = baselineHarnessScores(snapshot.runRows.all, acceptedRunIds, BASELINE_HARNESS);
-  state.topGroups = topFiveGroups(snapshot.runRows.all, acceptedRunIds, BASELINE_HARNESS);
-  updateTopFive();
+  renderSummaryLeaderboards(snapshot.runRows.all);
   renderRecentRuns();
   hideLoader();
   render();
@@ -700,9 +679,6 @@ window.addEventListener("popstate", () => {
   const expandedModels = new Set(params.getAll("expandModel"));
   const expandedMatrixGroups = new Set(params.getAll("expandGroup"));
   const matrixMetric = controls.matrixMetric;
-  const topSort = ["score", "cost", "balance"].includes(params.get("topSort"))
-    ? params.get("topSort") : "score";
-  state.topSort = topSort;
   const matrixMetricChanged = matrixMetric !== state.matrixMetric;
   const expansionChanged = !sameSelection(expandedHarnesses, state.expandedHarnesses) ||
     !sameSelection(matrixGroups, state.matrixGroups) ||
@@ -737,24 +713,17 @@ window.addEventListener("popstate", () => {
   // The card is part of the path too, so Back returns to the previous one.
   restoringCard = true;
   try {
-    updateTopFive();
     openCard(params.get("card"));
   } finally {
     restoringCard = false;
   }
 });
 
-document.querySelector("#top-five-sort").addEventListener("change", (event) => {
-  state.topSort = event.target.value;
-  updateTopFive();
-  syncUrl(true);
-});
 document.querySelector("#matrix-metric").addEventListener("change", (event) => {
   state.matrixMetric = MATRIX_METRIC_IDS.has(event.target.value) ? event.target.value : "score";
   writePreference(MATRIX_METRIC_KEY, state.matrixMetric);
   render();
   syncUrl();
-  updateTopFive();
 });
 
 document.querySelector("#reset-columns").addEventListener("click", () => {

@@ -1,0 +1,96 @@
+.summary-leaderboards {
+  margin: clamp(28px, 4vw, 48px) var(--page-pad) 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.summary-leaderboards-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: var(--gap);
+  padding: 18px 20px 0;
+}
+.summary-leaderboards h2 {
+  margin: 0;
+  font-size: var(--text-heading);
+}
+.summary-leaderboards-heading p,
+.summary-method {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: var(--text-body);
+  line-height: var(--leading-body);
+}
+.summary-method {
+  padding: 0 20px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.summary-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-muted);
+}
+.summary-tabs button {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: var(--text-body);
+  cursor: pointer;
+}
+.summary-tabs button[aria-selected="true"] {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 0 0 1px var(--border);
+  font-weight: 600;
+}
+.summary-tabs button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.summary-table-panel {
+  max-height: min(calc(10 * var(--row-height) + 1px), 52vh);
+  overflow: auto;
+}
+.summary-table-panel[hidden] {
+  display: none;
+}
+.summary-table-panel .gridjs-th {
+  background: var(--surface) !important;
+}
+.summary-results-table .gridjs-table,
+.summary-results-table-table {
+  min-width: 100% !important;
+}
+.summary-results-table .gridjs-th[data-column-id="model"],
+.summary-results-table .gridjs-td[data-column-id="model"],
+.summary-results-table .gridjs-th[data-column-id="harness"],
+.summary-results-table .gridjs-td[data-column-id="harness"] {
+  width: auto;
+  max-width: none;
+}
+@media (max-width: 700px) {
+  .summary-leaderboards-heading {
+    align-items: stretch;
+    flex-direction: column;
+    padding: 16px 14px 0;
+  }
+  .summary-method {
+    padding: 0 14px 12px;
+  }
+  .summary-tabs {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .summary-tabs button {
+    padding-inline: 7px;
+  }
+}

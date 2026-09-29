@@ -14,7 +14,7 @@
     </script>
     <link rel="stylesheet" href="./styles/base.css" />
     <link rel="stylesheet" href="./styles/header.css" />
-    <link rel="stylesheet" href="./styles/top-five.css" />
+    <link rel="stylesheet" href="./styles/summary-leaderboards.css" />
     <link rel="stylesheet" href="./styles/pareto.css" />
     <link rel="stylesheet" href="./styles/matrix.css" />
     <link rel="stylesheet" href="./styles/comparison.css" />
@@ -67,8 +67,31 @@
           </section>
         </div>
       </header>
+      <section class="summary-leaderboards" aria-labelledby="summary-leaderboards-title">
+        <div class="summary-leaderboards-heading">
+          <div>
+            <h2 id="summary-leaderboards-title">Leaderboards</h2>
+            <p>Full runs only. Each model–harness pair uses its latest available harness version.</p>
+          </div>
+          <div class="summary-tabs" role="tablist" aria-label="Leaderboard view">
+            <button type="button" role="tab" data-summary-tab="models" aria-controls="summary-models" aria-selected="true">Models</button>
+            <button type="button" role="tab" data-summary-tab="harnesses" aria-controls="summary-harnesses" aria-selected="false" tabindex="-1">Harnesses</button>
+            <button type="button" role="tab" data-summary-tab="combinations" aria-controls="summary-combinations" aria-selected="false" tabindex="-1">Model + harness</button>
+          </div>
+        </div>
+        <p class="summary-method">Combination score is the median of its runs. Model and harness scores are medians of combination scores.</p>
+        <div id="summary-models" class="summary-table-panel" role="tabpanel" data-summary-panel="models">
+          <div data-summary-grid="models"></div>
+        </div>
+        <div id="summary-harnesses" class="summary-table-panel" role="tabpanel" data-summary-panel="harnesses" hidden>
+          <div data-summary-grid="harnesses"></div>
+        </div>
+        <div id="summary-combinations" class="summary-table-panel" role="tabpanel" data-summary-panel="combinations" hidden>
+          <div data-summary-grid="combinations"></div>
+        </div>
+      </section>
       <section class="explorer-toolbar" aria-label="Explorer controls">
-        <h2 class="toolbar-title">Explore accepted results</h2>
+        <h2 class="toolbar-title">Runs</h2>
         <div class="view-actions">
           <a
             class="icon-button resource-link"
@@ -97,7 +120,7 @@
         </div>
       </section>
 
-      <section id="results-view" class="results-section" aria-label="Leaderboard">
+      <section id="results-view" class="results-section" aria-label="Runs">
         <div class="results-subhead">
           <p>
             Sort or filter accepted configurations. Scroll within the table for more runs; select
@@ -109,7 +132,7 @@
               <summary>Columns</summary>
               <div class="column-settings-panel">
                 <div class="column-settings-heading">
-                  <strong>Leaderboard columns</strong>
+                  <strong>Run columns</strong>
                   <button id="reset-columns" type="button">Reset</button>
                 </div>
                 <p>Drag or use the arrows to reorder. Clear a checkbox to hide a column.</p>
@@ -129,35 +152,6 @@
         </details>
         <div id="results-grid"></div>
       </section>
-      <section class="top-five" aria-labelledby="top-five-title">
-        <div class="top-five-heading">
-          <div>
-            <h2 id="top-five-title">Where the results lead</h2>
-            <p>Full runs only. At least 3 independent routes; price needs every trial measured.</p>
-          </div>
-          <label class="top-five-sort">Rank by
-            <select id="top-five-sort" aria-label="Rank both top-five lists by">
-              <option value="score">Score</option>
-              <option value="cost">Price</option>
-              <option value="balance">Balance</option>
-            </select>
-          </label>
-        </div>
-        <div class="top-five-grid">
-          <section class="top-five-card" aria-labelledby="top-models-title">
-            <h3 id="top-models-title">Top 5 models</h3>
-            <ol id="top-models" class="top-five-list"></ol>
-          </section>
-          <section class="top-five-card" aria-labelledby="top-harnesses-title">
-            <h3 id="top-harnesses-title">Top 5 harnesses</h3>
-            <ol id="top-harnesses" class="top-five-list"></ol>
-          </section>
-        </div>
-        <details class="top-five-guide">
-          <summary>How these rankings work</summary>
-          <p>Only full benchmark runs count. Models need at least three provider–harness routes; their score is the median across providers. Harnesses need at least three measured model–provider routes. Every harness uses its latest version with a full run anywhere. Its score is the mean over every model–provider route with a full pi-default baseline: a measured route replaces that baseline, while an untested route keeps it. Full repeats are first reduced to one median score per route. Each baseline route uses its latest full pi-default run, even if another route has a newer baseline version. Coverage and the score change from pi-default appear beside the harness name. Price uses only fully measured full runs; “—” means the measured routes lack a complete price. Score ranking keeps unpriced entries; Price and Balance exclude them. Balance adds the score rank and price rank with equal weight among entries with both. Bars show place in the selected ranking. These lists use the whole published snapshot, not the filters in the table above.</p>
-        </details>
-      </section>
       <section class="status-bar" aria-label="Dataset error" hidden>
         <span class="status-badge">
           <span class="status-dot" aria-hidden="true"></span>
@@ -171,39 +165,6 @@
             >source dataset</a
           >.
         </p>
-      </section>
-
-      <section class="pareto-panel" aria-labelledby="pareto-title">
-        <div class="pareto-heading">
-          <div>
-            <h2 id="pareto-title">Price × score frontier</h2>
-            <p id="pareto-context"></p>
-          </div>
-          <label class="pareto-axis-control">Horizontal axis
-            <select id="pareto-x-axis" aria-label="Pareto horizontal axis">
-              <option value="cost">Full-run price</option>
-              <option value="tokens">Full-run tokens</option>
-            </select>
-          </label>
-        </div>
-        <p class="pareto-chart-key">Solid green: Pareto frontier · Dashed blue: same combination at different reasoning levels · Whisker: repeated runs</p>
-        <div class="pareto-layout">
-          <div class="pareto-chart-wrap">
-            <div id="pareto-chart" role="region" aria-label="Price and score chart"></div>
-            <div id="pareto-tip" class="pareto-tip" hidden></div>
-          </div>
-          <aside class="pareto-side" aria-labelledby="pareto-list-title">
-            <section id="pareto-nearby" class="pareto-nearby" aria-label="Nearby chart points" hidden>
-              <h3>Nearby points</h3>
-              <p>Squares close together here. Choose any to compare.</p>
-              <div id="pareto-nearby-list"></div>
-            </section>
-            <h3 id="pareto-list-title">On the frontier</h3>
-            <p id="pareto-list-description">Lowest price with the highest score at each step.</p>
-            <ol id="pareto-list"></ol>
-          </aside>
-        </div>
-        <p class="pareto-note">Only full runs with a fully measured value on the chosen axis appear; prices are never estimated. Each square is one model route, harness version and reasoning level. Repeated full runs contribute one median point and a whisker if scores differ. The frontier is recalculated for the selected axis. Click a square or frontier entry to compare up to four; use Nearby points when squares overlap. Filters apply here too.</p>
       </section>
       <section class="summary-row" aria-label="Model route and harness matrix">
         <section class="panel matrix-panel">
@@ -252,6 +213,39 @@
             <span id="matrix-scale-max">—</span>
           </div>
         </section>
+      </section>
+
+      <section class="pareto-panel" aria-labelledby="pareto-title">
+        <div class="pareto-heading">
+          <div>
+            <h2 id="pareto-title">Price × score frontier</h2>
+            <p id="pareto-context"></p>
+          </div>
+          <label class="pareto-axis-control">Horizontal axis
+            <select id="pareto-x-axis" aria-label="Pareto horizontal axis">
+              <option value="cost">Full-run price</option>
+              <option value="tokens">Full-run tokens</option>
+            </select>
+          </label>
+        </div>
+        <p class="pareto-chart-key">Solid green: Pareto frontier · Dashed blue: same combination at different reasoning levels · Whisker: repeated runs</p>
+        <div class="pareto-layout">
+          <div class="pareto-chart-wrap">
+            <div id="pareto-chart" role="region" aria-label="Price and score chart"></div>
+            <div id="pareto-tip" class="pareto-tip" hidden></div>
+          </div>
+          <aside class="pareto-side" aria-labelledby="pareto-list-title">
+            <section id="pareto-nearby" class="pareto-nearby" aria-label="Nearby chart points" hidden>
+              <h3>Nearby points</h3>
+              <p>Squares close together here. Choose any to compare.</p>
+              <div id="pareto-nearby-list"></div>
+            </section>
+            <h3 id="pareto-list-title">On the frontier</h3>
+            <p id="pareto-list-description">Lowest price with the highest score at each step.</p>
+            <ol id="pareto-list"></ol>
+          </aside>
+        </div>
+        <p class="pareto-note">Only full runs with a fully measured value on the chosen axis appear; prices are never estimated. Each square is one model route, harness version and reasoning level. Repeated full runs contribute one median point and a whisker if scores differ. The frontier is recalculated for the selected axis. Click a square or frontier entry to compare up to four; use Nearby points when squares overlap. Filters apply here too.</p>
       </section>
       <section
         id="selection-panel"
