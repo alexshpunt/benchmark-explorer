@@ -27,7 +27,7 @@ import { baselineHarnessScores } from "./modules/baseline-score.mjs";
 
 /** Public home of the accepted data, and the base for every provenance link. */
 const DATASET_PAGE = "https://huggingface.co/datasets/alexshpunt/explicit-edit-benchmark";
-const BASELINE_HARNESS = "pi-default";
+const BASELINE_HARNESS = "baseline-agent";
 /** Comparison series colours, resolved per theme by styles/comparison.css. */
 const COLORS = ["var(--series-1)", "var(--series-2)", "var(--series-3)", "var(--series-4)"];
 const FILTER_LABELS = {

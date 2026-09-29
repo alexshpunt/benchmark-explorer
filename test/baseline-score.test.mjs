@@ -7,11 +7,24 @@ const full = (model, provider, harness, version, runId, score) => ({
   runId, score, fullBenchmark: true,
 });
 
+test("the default baseline is baseline-agent, not pi-default", () => {
+  const rows = [
+    full("a", "p", "baseline-agent", "1", "b", 0.8),
+    full("a", "p", "pi-default", "1", "p", 0.5),
+    full("extra", "p", "pi-default", "1", "extra", 0.1),
+  ];
+  const scores = baselineHarnessScores(rows, rows.map((row) => row.runId));
+  assert.equal(scores.baselineHarness, "baseline-agent");
+  assert.equal(scores.models, 1);
+  assert.equal(scores.baselineMean, 0.8);
+  assert.equal(scores.harnesses.get("baseline-agent").delta, 0);
+  assert.ok(Math.abs(scores.harnesses.get("pi-default").delta + 0.3) < 1e-10);
+});
 test("missing routes inherit their own baseline and every provider route gets one vote", () => {
   const rows = [
-    full("luna", "a", "pi-default", "1", "b1", 0.9),
-    full("luna", "b", "pi-default", "1", "b2", 0.7),
-    full("glm", "c", "pi-default", "1", "b3", 0.4),
+    full("luna", "a", "baseline-agent", "1", "b1", 0.9),
+    full("luna", "b", "baseline-agent", "1", "b2", 0.7),
+    full("glm", "c", "baseline-agent", "1", "b3", 0.4),
     full("luna", "a", "other", "2", "h1", 0.95),
     full("luna", "a", "other", "2", "h2", 0.85),
     full("glm", "c", "other", "2", "h3", 0.35),
@@ -22,14 +35,14 @@ test("missing routes inherit their own baseline and every provider route gets on
   assert.ok(Math.abs(scores.harnesses.get("other").score - 0.65) < 1e-10);
   assert.equal(scores.harnesses.get("other").covered, 2);
   assert.deepEqual(scores.harnesses.get("other").models, ["luna\ta", "glm\tc"]);
-  assert.equal(scores.harnesses.get("pi-default").delta, 0);
+  assert.equal(scores.harnesses.get("baseline-agent").delta, 0);
 });
 
 test("the latest complete harness version applies globally; baseline stays latest per route", () => {
   const rows = [
-    full("a", "p", "pi-default", "1", "b1", 0.5),
-    full("b", "p", "pi-default", "2", "b2", 0.6),
-    full("a", "p", "pi-default", "3", "b3", 0.7),
+    full("a", "p", "baseline-agent", "1", "b1", 0.5),
+    full("b", "p", "baseline-agent", "2", "b2", 0.6),
+    full("a", "p", "baseline-agent", "3", "b3", 0.7),
     full("a", "p", "other", "1", "h1", 0.9),
     full("b", "p", "other", "1", "h2", 0.9),
     full("a", "p", "other", "2", "h3", 0.8),
@@ -48,16 +61,16 @@ test("the latest complete harness version applies globally; baseline stays lates
 test("another harness can supply the per-route baseline without changing the formula", () => {
   const rows = [full("a", "p", "reference", "1", "r1", 0.4),
     full("b", "p", "reference", "1", "r2", 0.8),
-    full("a", "p", "pi-default", "1", "p1", 0.5)];
+    full("a", "p", "baseline-agent", "1", "p1", 0.5)];
   const scores = baselineHarnessScores(rows, rows.map((row) => row.runId), "reference");
   assert.equal(scores.models, 2);
-  assert.ok(Math.abs(scores.harnesses.get("pi-default").score - 0.65) < 1e-10);
-  assert.equal(scores.harnesses.get("pi-default").covered, 1);
+  assert.ok(Math.abs(scores.harnesses.get("baseline-agent").score - 0.65) < 1e-10);
+  assert.equal(scores.harnesses.get("baseline-agent").covered, 1);
 });
 
 test("an unbaselined route cannot change the score or its denominator", () => {
   const rows = [
-    full("a", "p", "pi-default", "1", "b", 0.5),
+    full("a", "p", "baseline-agent", "1", "b", 0.5),
     full("a", "p", "other", "1", "h", 0.7),
     full("missing", "p", "other", "1", "orphan", 0.01),
   ];

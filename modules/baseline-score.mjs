@@ -7,7 +7,7 @@ const mean = (values) => values.reduce((sum, value) => sum + value, 0) / values.
  * Missing routes have zero delta, not zero score. No source row is imputed.
  * The baseline harness can be changed without changing this calculation.
  */
-export function baselineHarnessScores(rows, acceptedRunIds, baselineHarness = "pi-default") {
+export function baselineHarnessScores(rows, acceptedRunIds, baselineHarness = "baseline-agent") {
   const order = new Map(acceptedRunIds.map((id, index) => [id, index]));
   const full = rows.filter((row) => row.fullBenchmark && Number.isFinite(row.score));
   const harnessVersions = new Map();

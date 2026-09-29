@@ -564,7 +564,7 @@ export function createMatrix(state, {
     summaryLabel.className = "matrix-model-column";
     summaryLabel.textContent = "Across all models";
     summaryLabel.title = state.matrixMetric === "score"
-      ? `Baseline-adjusted mean across all full ${state.baselineScores?.baselineHarness ?? "pi-default"} model-provider routes; missing results use their route baseline`
+      ? `Baseline-adjusted mean across all full ${state.baselineScores?.baselineHarness ?? "baseline-agent"} model-provider routes; missing results use their route baseline`
       : "Median across model families, with one vote per model";
     summaryRow.append(summaryLabel);
     for (const column of series) {
