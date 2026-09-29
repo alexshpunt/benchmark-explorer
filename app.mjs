@@ -110,6 +110,8 @@ const state = {
   matrixMetric: initialMatrixMetric,
   paretoX: initialParams.get("paretoX") === "tokens" ? "tokens" : "cost",
   baselineScores: null,
+  matrixBaselineOnly: initialParams.get("matrixRoutes") !== "all",
+
   /** Harness families whose individual versions are visible in the matrix. */
   expandedHarnesses: new Set(initialControls.expandedHarnesses),
   matrixGroups: new Set(
@@ -184,6 +186,8 @@ function currentSearch() {
     if (!state.matrixGroups.has(group)) params.append("ungroup", group);
   for (const model of [...state.expandedModels].sort()) params.append("expandModel", model);
   for (const group of [...state.expandedMatrixGroups].sort()) params.append("expandGroup", group);
+  if (!state.matrixBaselineOnly) params.set("matrixRoutes", "all");
+
   for (const selection of state.selected) params.append("select", selection);
   if (state.paretoX !== "cost") params.set("paretoX", state.paretoX);
   if (initialParams.get("testRuns") === "50") params.set("testRuns", "50");
@@ -399,6 +403,8 @@ const { renderActiveFilters, buildFilterMenus, repositionFilterPopover,
 });
 
 function renderMatrixState(cells) {
+  document.querySelector("#matrix-baseline-only").checked = state.matrixBaselineOnly;
+
   for (const cell of cells) state.matrixCellCache.set(cell.key, cell);
   const visible = groupedMatrixCells(cells);
   const modelRoutes = new Set(visible.map((cell) =>
@@ -679,6 +685,10 @@ window.addEventListener("popstate", () => {
   const expandedModels = new Set(params.getAll("expandModel"));
   const expandedMatrixGroups = new Set(params.getAll("expandGroup"));
   const matrixMetric = controls.matrixMetric;
+  const matrixBaselineOnly = params.get("matrixRoutes") !== "all";
+  const routesChanged = matrixBaselineOnly !== state.matrixBaselineOnly;
+  state.matrixBaselineOnly = matrixBaselineOnly;
+
   const matrixMetricChanged = matrixMetric !== state.matrixMetric;
   const expansionChanged = !sameSelection(expandedHarnesses, state.expandedHarnesses) ||
     !sameSelection(matrixGroups, state.matrixGroups) ||
@@ -700,7 +710,7 @@ window.addEventListener("popstate", () => {
     state.expandedModels = expandedModels;
     state.expandedMatrixGroups = expandedMatrixGroups;
     render();
-  } else if (expansionChanged) {
+  } else if (expansionChanged || routesChanged) {
     state.expandedHarnesses = expandedHarnesses;
     state.matrixGroups = matrixGroups;
     state.expandedModels = expandedModels;
@@ -717,6 +727,12 @@ window.addEventListener("popstate", () => {
   } finally {
     restoringCard = false;
   }
+});
+
+document.querySelector("#matrix-baseline-only").addEventListener("change", (event) => {
+  state.matrixBaselineOnly = event.target.checked;
+  renderMatrixState(matrixCells(state.configurations, state.compactConfigurations, state.expandedHarnesses));
+  syncUrl();
 });
 
 document.querySelector("#matrix-metric").addEventListener("change", (event) => {

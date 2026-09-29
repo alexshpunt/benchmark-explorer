@@ -32,7 +32,14 @@ export function baselineHarnessScores(rows, acceptedRunIds, baselineHarness = "b
       else selected.set(key, { runId: row.runId, version: row.harnessVersion ?? "", rows: [row] });
     } else if (!previous || (order.get(row.runId) ?? -1) > (order.get(previous.runId) ?? -1)) {
       selected.set(key, { runId: row.runId, version: row.harnessVersion ?? "", rows: [row] });
-    } else if (previous.runId === row.runId) previous.rows.push(row);
+    }
+  }
+  // Pool all repeats of each route's selected baseline version, regardless of input order.
+  for (const [key, result] of selected) {
+    const [harness, route] = JSON.parse(key);
+    if (harness === baselineHarness) result.rows = full.filter((row) =>
+      row.harnessFamily === harness && modelRouteIdentity(row) === route &&
+      (row.harnessVersion ?? "") === result.version);
   }
   const byHarness = new Map();
   for (const [key, result] of selected) {
@@ -57,6 +64,7 @@ export function baselineHarnessScores(rows, acceptedRunIds, baselineHarness = "b
     const delta = harness === baselineHarness ? 0 :
       matched.reduce((sum, [route, result]) => sum + result.score - baselines.get(route).score, 0) / models;
     harnesses.set(harness, { score: baselineMean + delta, delta, covered: matched.length,
+      coverage: matched.length / models,
       models: matched.map(([route]) => route), total: models,
       version: harness === baselineHarness ? null : harnessVersions.get(harness),
       rows: matched.flatMap(([, result]) => result.rows) });

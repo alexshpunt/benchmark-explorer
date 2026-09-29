@@ -79,6 +79,10 @@ export function matrixPartialCoverage(rows, total) {
   const count = Math.max(0, ...rows.map((row) => row.taskCount ?? 0));
   return count ? { count: Math.min(count, total), total } : null;
 }
+/** Restrict display routes before provider grouping, without changing baseline ratings. */
+export function matrixDisplayCells(cells, baselineScores, baselineOnly = true) {
+  return baselineOnly ? cells.filter((cell) => baselineScores?.baselines.has(cell.model)) : cells;
+}
 /** Pin the baseline first, then rank harness blocks and their members by score. */
 export function matrixHarnessOrder(harnesses, baselineScores, groupOf) {
   const baseline = baselineScores?.baselineHarness ?? "baseline-agent";
@@ -343,6 +347,7 @@ export function createMatrix(state, {
   }
   /** Build collapsed columns and model rows from the route-level matrix cells. */
   function groupedMatrixCells(cells) {
+    cells = matrixDisplayCells(cells, state.baselineScores, state.matrixBaselineOnly);
     const models = state.matrixGroups.has("model");
     const harnesses = state.matrixGroups.has("harness");
     const extensions = state.matrixGroups.has("extension");

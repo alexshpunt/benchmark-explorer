@@ -486,6 +486,8 @@ main {
   font-size: var(--text-body);
 }
 .matrix-heading-meta {
+  flex-wrap: wrap;
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 14px;

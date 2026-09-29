@@ -7,6 +7,62 @@ const full = (model, provider, harness, version, runId, score) => ({
   runId, score, fullBenchmark: true,
 });
 
+test("specification example keeps a fixed M, imputes missing only in totals, and survives display switches", async () => {
+  const { matrixDisplayCells } = await import("../modules/matrix.mjs");
+  const rows = [
+    full("Luna", "p", "baseline-agent", "1", "b1", 0.9),
+    full("Kimi", "p", "baseline-agent", "1", "b2", 0.7),
+    full("GLM", "p", "baseline-agent", "1", "b3", 0.4),
+    full("Luna", "p", "A", "1", "a1", 0.94),
+    full("Luna", "p", "A", "1", "a2", 0.96),
+    full("GLM", "p", "A", "1", "a3", 0.35),
+    full("Luna", "p", "pi-default", "1", "p1", 0.95),
+    full("outside", "p", "A", "1", "outside", 0.99),
+    { ...full("partial", "p", "baseline-agent", "1", "partial", 0.9), fullBenchmark: false },
+  ];
+  const original = structuredClone(rows);
+  const calculate = (data) => baselineHarnessScores(data, data.map((row) => row.runId));
+  const scores = calculate(rows);
+  const close = (actual, expected) => assert.ok(Math.abs(actual - expected) < 1e-10);
+  assert.equal(scores.models, 3);
+  close(scores.baselineMean, 2 / 3);
+  close(scores.harnesses.get("baseline-agent").score, 2 / 3);
+  assert.equal(scores.harnesses.get("baseline-agent").delta, 0);
+  close(scores.harnesses.get("A").score, 2 / 3);
+  close(scores.harnesses.get("A").delta, 0);
+  assert.equal(scores.harnesses.get("A").covered, 2);
+  close(scores.harnesses.get("A").coverage, 2 / 3);
+  close(scores.harnesses.get("pi-default").coverage, 1 / 3);
+  assert.equal(scores.harnesses.get("baseline-agent").coverage, 1);
+  close(scores.harnesses.get("pi-default").score, 0.6833333333333333);
+  close(scores.harnesses.get("pi-default").delta, 0.05 / 3);
+  assert.equal(scores.harnesses.get("pi-default").covered, 1);
+  assert.equal(scores.harnesses.get("A").rows.some((row) => row.modelFamily === "Kimi"), false);
+  const added = calculate([...rows, full("outside", "p", "new", "1", "new", 0.1)]);
+  assert.deepEqual(added.baselines, scores.baselines);
+  assert.deepEqual(added.harnesses.get("A"), scores.harnesses.get("A"));
+  const cells = [...scores.baselines.keys(), "outside\tp", "partial\tp", "Luna\tother-provider"]
+    .map((model) => ({ model, score: null }));
+  const before = structuredClone(scores);
+  assert.equal(matrixDisplayCells(cells, scores).length, 3);
+  assert.equal(matrixDisplayCells(cells, scores, false).length, 6);
+  assert.equal(matrixDisplayCells(cells, scores, true).length, 3);
+  assert.deepEqual(scores, before);
+  assert.ok(cells.every((cell) => cell.score === null));
+  assert.deepEqual(rows, original);
+});
+test("baseline repeats share one route vote and use the latest run's version", () => {
+  const rows = [
+    full("a", "p", "baseline-agent", "1", "b1", 0.6),
+    full("a", "p", "baseline-agent", "old", "old", 0.1),
+    full("a", "p", "baseline-agent", "1", "b2", 1),
+    full("b", "p", "baseline-agent", "1", "b3", 0.4),
+  ];
+  const scores = baselineHarnessScores(rows, rows.map((row) => row.runId));
+  assert.equal(scores.models, 2);
+  assert.equal(scores.baselines.get("a\tp").score, 0.8);
+  assert.ok(Math.abs(scores.baselineMean - 0.6) < 1e-10);
+});
 test("the default baseline is baseline-agent, not pi-default", () => {
   const rows = [
     full("a", "p", "baseline-agent", "1", "b", 0.8),
