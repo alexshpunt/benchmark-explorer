@@ -652,7 +652,13 @@ async function load() {
   installSnapshot(snapshot, "Published snapshot");
 }
 
-closeOnOutsideClick(document.querySelector("#cell-details"));
+document.querySelectorAll("dialog").forEach(closeOnOutsideClick);
+
+document.addEventListener("pointerdown", (event) => {
+  for (const overlay of document.querySelectorAll("details[data-overlay][open]")) {
+    if (!overlay.contains(event.target)) overlay.removeAttribute("open");
+  }
+});
 document.querySelector("#cell-details").addEventListener("close", () => setCard(null));
 
 document.querySelector("#clear-selection").addEventListener("click", () => {

@@ -27,3 +27,11 @@ test("published page includes every split browser asset", async () => {
   await Promise.all([...styles, ...modules].map((path) => access(new URL(`../${path}`, import.meta.url))));
   assert.match(workflow, /cp -R modules styles \.space\//);
 });
+
+test("every custom overlay supports light dismiss", async () => {
+  const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
+  const app = await readFile(new URL("../app.mjs", import.meta.url), "utf8");
+  assert.match(app, /querySelectorAll\("dialog"\)\.forEach\(closeOnOutsideClick\)/);
+  assert.match(app, /details\[data-overlay\]\[open\]/);
+  assert.match(html, /<details id="column-settings"[^>]*data-overlay/);
+});
