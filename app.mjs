@@ -506,6 +506,7 @@ function renderRecentRuns() {
       : run.runId;
     const id = document.createElement("small");
     id.textContent = run.runId;
+    if (run.submittedBy?.accountId) id.textContent += ` · by @${run.submittedBy.accountId}`;
     link.title = `${name.textContent} · ${run.runId}`;
     label.className = "recent-identity";
     label.append(name, id);
