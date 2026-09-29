@@ -92,7 +92,12 @@ test("compact tool counts preserve normalized tool events", () => {
 });
 
 test("all accepted runs are sorted newest first with their full-run score", () => {
-  const runs = [{ runId: "older" }, { runId: "newer" }];
+  const submittedBy = {
+    platform: "huggingface",
+    accountId: "alice",
+    profileUrl: "https://huggingface.co/alice",
+  };
+  const runs = [{ runId: "older" }, { runId: "newer", submittedBy }];
   const rows = [
     { runId: "older", score: 0.7, fullBenchmark: true },
     { runId: "newer", score: 0.9, fullBenchmark: true },
@@ -102,7 +107,7 @@ test("all accepted runs are sorted newest first with their full-run score", () =
     { title: "Accept benchmark observation older", date: "2026-09-27T12:00:00.000Z" },
   ];
   assert.deepEqual(acceptedRunHighlights(runs, rows, commits), [
-    { runId: "newer", acceptedAt: commits[0].date, score: 0.9 },
+    { runId: "newer", acceptedAt: commits[0].date, score: 0.9, submittedBy },
     { runId: "older", acceptedAt: commits[1].date, score: 0.7 },
   ]);
 });
