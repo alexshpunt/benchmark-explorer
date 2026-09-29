@@ -60,6 +60,7 @@
           <section class="editorial-recent" aria-labelledby="recent-runs-title">
             <div class="editorial-recent-heading">
               <h2 id="recent-runs-title">Latest additions</h2>
+              <button id="view-all-additions" class="editorial-view-all" type="button">View all</button>
               <span>From the published dataset</span>
             </div>
             <ol id="recent-runs" class="editorial-recent-list"><li>Loading runs…</li></ol>
@@ -292,7 +293,17 @@
           </section>
         </div>
       </section>
-      <dialog id="cell-details" class="cell-details">
+      <dialog id="additions-dialog" class="additions-dialog" aria-labelledby="additions-dialog-title">
+          <header>
+            <div>
+              <h2 id="additions-dialog-title">All additions</h2>
+              <p>Published runs, newest first</p>
+            </div>
+            <button id="close-additions" class="dialog-close" type="button" aria-label="Close">×</button>
+          </header>
+          <div id="additions-grid" class="additions-grid"></div>
+        </dialog>
+        <dialog id="cell-details" class="cell-details">
         <div class="cell-details-heading">
           <div>
             <h2 id="cell-details-title">Cell details</h2>

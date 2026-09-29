@@ -5,7 +5,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { buildSnapshot, recentRunHighlights } from "../scripts/build-snapshot.mjs";
+import { acceptedRunHighlights, buildSnapshot, recentRunHighlights } from "../scripts/build-snapshot.mjs";
 import {
   aggregateLeaderboard,
   compactToolCalls,
@@ -89,6 +89,22 @@ test("compact tool counts preserve normalized tool events", () => {
     () => expandToolCounts([{ runId: "run", roundId: "round", tool: "read", calls: -1 }]),
     /Invalid compact tool count/,
   );
+});
+
+test("all accepted runs are sorted newest first with their full-run score", () => {
+  const runs = [{ runId: "older" }, { runId: "newer" }];
+  const rows = [
+    { runId: "older", score: 0.7, fullBenchmark: true },
+    { runId: "newer", score: 0.9, fullBenchmark: true },
+  ];
+  const commits = [
+    { title: "Accept benchmark observation newer", date: "2026-09-28T12:00:00.000Z" },
+    { title: "Accept benchmark observation older", date: "2026-09-27T12:00:00.000Z" },
+  ];
+  assert.deepEqual(acceptedRunHighlights(runs, rows, commits), [
+    { runId: "newer", acceptedAt: commits[0].date, score: 0.9 },
+    { runId: "older", acceptedAt: commits[1].date, score: 0.7 },
+  ]);
 });
 
 test("recent runs use their dataset acceptance date and median of full scores", () => {

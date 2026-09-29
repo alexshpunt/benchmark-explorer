@@ -16,7 +16,8 @@ import {
   verifyPublishedBytes,
 } from "./core.mjs";
 import { createFilters } from "./modules/filters.mjs";
-import { createLeaderboard } from "./modules/leaderboard.mjs";
+import { createLeaderboard, renderDataTable } from "./modules/leaderboard.mjs";
+import { h } from "./vendor/gridjs-6.2.0.mjs";
 import { createDetails } from "./modules/details.mjs";
 import { createComparison } from "./modules/comparison.mjs";
 import { createMatrix } from "./modules/matrix.mjs";
@@ -414,14 +415,20 @@ function renderMatrixState(cells) {
   renderMatrix(visible);
   renderComparison(cells);
 }
+function withAcceptanceDates(rows) {
+  const dates = new Map(state.snapshot.acceptedRuns.map((run) => [run.runId, run.acceptedAt]));
+  return rows.map((row) => ({ ...row, acceptedAt: row.runIds
+    .map((runId) => dates.get(runId)).filter(Boolean)
+    .sort((left, right) => Date.parse(right) - Date.parse(left))[0] ?? null }));
+}
 function render() {
-  const configurationRows = aggregateLeaderboard(
+  const configurationRows = withAcceptanceDates(aggregateLeaderboard(
     state.index,
     state.profiles,
     state.trials,
     state.rounds,
     activeFilters(),
-  );
+  ));
   const runRows = filterSnapshotRunRows(state.snapshot, activeFilters());
   const compactRows = latestHarnessConfigurations(
     runRows,
@@ -515,9 +522,46 @@ function renderRecentRuns() {
     return item;
   }));
 }
+let additionsGrid;
+function renderAllAdditions() {
+  const profiles = new Map();
+  for (const profile of state.profiles) if (!profiles.has(profile.runId)) profiles.set(profile.runId, profile);
+  const rows = state.snapshot.acceptedRuns.map((run) => ({ ...run, profile: profiles.get(run.runId) }));
+  const columns = [
+    { id: "dateAdded", name: "Date added", sort: false, cell: (row) => new Intl.DateTimeFormat("en", {
+      month: "short", day: "numeric", year: "numeric", timeZone: "UTC",
+    }).format(new Date(row.acceptedAt)) },
+    { id: "score", name: "Score", sort: false,
+      cell: (row) => row.score == null ? "—" : Number((row.score * 100).toFixed(1)) },
+    { id: "model", name: "Provider / model", sort: false,
+      cell: (row) => `${row.profile?.provider ?? "unknown"} / ${row.profile?.modelFamily ?? row.profile?.modelId ?? "Model"}` },
+    { id: "agent", name: "Agent / harness", sort: false,
+      cell: (row) => `${row.profile?.agentFamily ?? "Agent"} / ${row.profile?.harnessFamily ?? row.profile?.harnessId ?? "Harness"}` },
+    { id: "run", name: "Run", sort: false, cell: (row) => row.runId },
+  ];
+  additionsGrid?.destroy();
+  const host = document.querySelector("#additions-grid");
+  host.replaceChildren();
+  additionsGrid = renderDataTable(host, rows, columns, {
+    className: "results-table",
+    onCell: ({ cell, row }) => h("button", { type: "button", className: "cell-detail",
+      title: `Open ${row.runId}`, onClick: () => {
+        document.querySelector("#additions-dialog").close();
+        openRunDetails(row.runId);
+      } }, String(cell)),
+  });
+}
+
 const SNAPSHOT_CACHE = "benchmark-explorer:snapshots:v1";
 const SNAPSHOT_MANIFEST_KEY = "benchmark-explorer:snapshot-manifest:v1";
 let initialViewRestored = false;
+
+document.querySelector("#view-all-additions").addEventListener("click", () => {
+  renderAllAdditions();
+  document.querySelector("#additions-dialog").showModal();
+});
+document.querySelector("#close-additions").addEventListener("click", () =>
+  document.querySelector("#additions-dialog").close());
 
 function validSnapshotManifest(manifest) {
   return manifest?.schemaVersion === 1 && /^[a-f0-9]{40}$/.test(manifest.revision) &&
@@ -530,7 +574,8 @@ async function parseSnapshot(manifest, bytes) {
   const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("gzip"));
   const snapshot = JSON.parse(await new Response(stream).text());
   if (snapshot.schemaVersion !== 1 || snapshot.revision !== manifest.revision ||
-      !Array.isArray(snapshot.runRows?.all) || !Array.isArray(snapshot.recentRuns) ||
+      !Array.isArray(snapshot.runRows?.all) || !Array.isArray(snapshot.acceptedRuns) ||
+      !Array.isArray(snapshot.recentRuns) ||
       !Array.isArray(snapshot.trials) || snapshot.trials.length !== manifest.trials ||
       !Array.isArray(snapshot.toolCounts))
     throw Error("Snapshot contents do not match the manifest");

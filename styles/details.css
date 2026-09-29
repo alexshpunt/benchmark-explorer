@@ -220,3 +220,34 @@
   background: var(--surface-hover);
   color: var(--text);
 }
+.additions-dialog {
+  width: min(1180px, calc(100vw - 32px));
+  max-width: none;
+  height: min(760px, calc(100vh - 32px));
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+}
+.additions-dialog::backdrop { background: rgb(3 8 18 / 72%); }
+.additions-dialog > header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.additions-dialog h2, .additions-dialog p { margin: 0; }
+.additions-dialog p { margin-top: 3px; color: var(--muted); font-size: var(--text-small); }
+.additions-dialog .dialog-close {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 26px;
+  cursor: pointer;
+}
+.additions-grid { height: calc(100% - 76px); overflow: auto; }
+.additions-grid .results-table { height: 100%; }
+.additions-grid .gridjs-wrapper { max-height: none; }

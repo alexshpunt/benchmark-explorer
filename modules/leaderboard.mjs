@@ -4,9 +4,33 @@ import {
 } from "../core.mjs";
 import { Grid, h } from "../vendor/gridjs-6.2.0.mjs";
 
+/** Render the shared Explorer data-table shell with caller-defined rows and columns. */
+export function renderDataTable(host, rows, columns, { className = "results-table", onCell } = {}) {
+  const data = rows.map((row, index) => [...columns.map((column) => column.cell(row, index)), index]);
+  const gridColumns = columns.map((column) => ({
+    name: column.name,
+    id: column.id,
+    sort: column.sort === false ? false : {},
+    attributes: {
+      "data-column-id": column.id,
+      "data-value-kind": column.range || column.id === "#" ? "number" : "text",
+    },
+    formatter: (cell, gridRow) => {
+      const index = gridRow.cells.at(-1).data;
+      const row = rows[index];
+      if (!row || !onCell) return cell == null ? "—" : String(cell);
+      return onCell({ cell, column, index, row });
+    },
+  }));
+  gridColumns.push({ name: "row", id: "row", hidden: true, sort: false });
+  return new Grid({
+    columns: gridColumns, data, autoWidth: false, sort: true,
+    className: { container: className, table: `${className}-table`, search: `${className}-search` },
+  }).render(host);
+}
 /** Optional leaderboard columns hidden until a reader enables them in Columns. */
 export const DEFAULT_HIDDEN_IDS = [
-  "trials", "provider", "harness", "harnessVersion", "thinking", "coverage",
+  "dateAdded", "trials", "provider", "harness", "harnessVersion", "thinking", "coverage",
   "firstExact(%)", "finalExact(%)", "recoveryGain", "avgSeconds", "avgCost($)", "avgTokens",
 ];
 
@@ -52,6 +76,18 @@ export function createLeaderboard(state, {
           ["Rank", String(index + 1)],
           ["Visible configurations", String(state.rows.length)],
         ],
+      },
+    },
+    {
+      id: "dateAdded",
+      name: "Date added",
+      tooltip: "Date the newest accepted run in this configuration was added to the published Dataset.",
+      cell: (row) => row.acceptedAt ? new Intl.DateTimeFormat("en", {
+        month: "short", day: "numeric", year: "numeric", timeZone: "UTC",
+      }).format(new Date(row.acceptedAt)) : "—",
+      detail: {
+        lines: ["The acceptance date of the newest published run included in this aggregated configuration."],
+        inputs: (row) => [["Date added", row.acceptedAt ?? "—"]],
       },
     },
     {
@@ -663,49 +699,19 @@ export function createLeaderboard(state, {
     state.rows = rows.toSorted((left, right) =>
       Number(right.fullBenchmark) - Number(left.fullBenchmark) || right.score - left.score);
     const tableColumns = leaderboardColumns();
-    const data = state.rows.map((row, index) => [
-      ...tableColumns.map((column) => column.cell(row, index)),
-      index,
-    ]);
-    const columns = tableColumns.map((column) => ({
-      name: column.name,
-      id: column.id,
-      sort: column.sort === false ? false : {},
-      attributes: {
-        "data-column-id": column.id,
-        "data-value-kind": column.range || column.id === "#" ? "number" : "text",
-      },
-      formatter: (cell, gridRow) => {
-        // Sorting moves rows, so the original position travels in a hidden column.
-        const index = gridRow.cells.at(-1).data;
-        const row = state.rows[index];
-        if (!row) return cell;
-        return h(
-          "button",
-          {
-            type: "button",
-            className: "cell-detail",
-            "data-row-index": String(index),
-            title: `Explain ${column.name.toLowerCase()}`,
-            onClick: () =>
-              column.open ? column.open(row) : openCellDetails(row, index, column.id),
-          },
-          cell == null ? "—" : String(cell),
-        );
-      },
-    }));
-    columns.push({ name: "row", id: "row", hidden: true, sort: false });
-    resultsGrid = new Grid({
-      columns,
-      data,
-      autoWidth: false,
-      sort: true,
-      className: {
-        container: "results-table",
-        table: "results-table-table",
-        search: "results-table-search",
-      },
-    }).render(host);
+    resultsGrid = renderDataTable(host, state.rows, tableColumns, {
+      onCell: ({ cell, column, index, row }) => h(
+        "button",
+        {
+          type: "button",
+          className: "cell-detail",
+          "data-row-index": String(index),
+          title: `Explain ${column.name.toLowerCase()}`,
+          onClick: () => column.open ? column.open(row) : openCellDetails(row, index, column.id),
+        },
+        cell == null ? "—" : String(cell),
+      ),
+    });
     ensureLeaderboardTable();
   }
 

@@ -31,7 +31,6 @@ export async function batchedRunDates(runIds, commits, dataset, fetcher = fetch)
   };
   for (let index = 0; index < commits.length - 1 && missing.size; index++) {
     const commit = commits[index];
-    if (!/^Accept \d+ verified benchmark execution\(s\)$/.test(commit.title)) continue;
     const current = await at(commit);
     if (![...missing].some((id) => current.has(id))) continue;
     const previous = await at(commits[index + 1]);
@@ -43,12 +42,12 @@ export async function batchedRunDates(runIds, commits, dataset, fetcher = fetch)
   return dates;
 }
 
-/** Give the three newest accepted runs their commit dates and full-run median scores. */
-export function recentRunHighlights(runs, rows, commits, batchedDates = new Map()) {
+/** Give accepted runs their Dataset acceptance dates and full-run median scores. */
+export function acceptedRunHighlights(runs, rows, commits, batchedDates = new Map()) {
   const dates = new Map(commits
     .filter((commit) => commit.title?.startsWith("Accept benchmark observation "))
     .map((commit) => [commit.title.slice("Accept benchmark observation ".length), commit.date]));
-  return runs.slice(-3).reverse().map(({ runId }) => {
+  return runs.map(({ runId }) => {
     const acceptedAt = dates.get(runId) ?? batchedDates.get(runId);
     if (!acceptedAt || !Number.isFinite(Date.parse(acceptedAt)))
       throw Error(`Missing Dataset acceptance date for ${runId}`);
@@ -58,7 +57,12 @@ export function recentRunHighlights(runs, rows, commits, batchedDates = new Map(
       score: median(rows.filter((row) => row.runId === runId && row.fullBenchmark)
         .map((row) => row.score)),
     };
-  });
+  }).sort((left, right) => Date.parse(right.acceptedAt) - Date.parse(left.acceptedAt));
+}
+
+/** Give the three newest accepted runs their commit dates and full-run median scores. */
+export function recentRunHighlights(runs, rows, commits, batchedDates = new Map()) {
+  return acceptedRunHighlights(runs.slice(-3), rows, commits, batchedDates).slice(0, 3);
 }
 /** Build one revision-pinned, checked Explorer artifact from accepted Dataset files. */
 export async function buildSnapshot({ dataset = "https://huggingface.co/datasets/alexshpunt/explicit-edit-benchmark",
@@ -107,6 +111,7 @@ export async function buildSnapshot({ dataset = "https://huggingface.co/datasets
   for (const family of families) runRows[family] = aggregateRunConfigurations(
     index, evidence.profiles, evidence.trials, evidence.rounds, { taskFamily: [family] });
   views.fullRunKeys = markFullBenchmarkRows(runRows, views);
+  let acceptedRuns = [];
   let recentRuns = [];
   if (index.runs.length) {
     const datasetUrl = new URL(dataset);
@@ -116,14 +121,15 @@ export async function buildSnapshot({ dataset = "https://huggingface.co/datasets
     if (!commitsResponse.ok) throw Error(`Dataset commit history: HTTP ${commitsResponse.status}`);
     const commits = await commitsResponse.json();
     if (!Array.isArray(commits)) throw Error("Invalid Dataset commit history");
-    const recentIds = index.runs.slice(-3).map((run) => run.runId);
+    const runIds = index.runs.map((run) => run.runId);
     const explicit = new Set(commits.filter((commit) => commit.title?.startsWith("Accept benchmark observation "))
       .map((commit) => commit.title.slice("Accept benchmark observation ".length)));
-    const missing = recentIds.filter((id) => !explicit.has(id));
+    const missing = runIds.filter((id) => !explicit.has(id));
     const batched = missing.length ? await batchedRunDates(missing, commits, dataset, fetcher) : new Map();
-    recentRuns = recentRunHighlights(index.runs, runRows.all, commits, batched);
+    acceptedRuns = acceptedRunHighlights(index.runs, runRows.all, commits, batched);
+    recentRuns = acceptedRuns.slice(0, 3);
   }
-  const snapshot = { schemaVersion: 1, revision, index, views, runRows, recentRuns, ...evidence };
+  const snapshot = { schemaVersion: 1, revision, index, views, runRows, acceptedRuns, recentRuns, ...evidence };
   const bytes = gzipSync(JSON.stringify(snapshot), { level: 9, mtime: 0 });
   const sha256 = createHash("sha256").update(bytes).digest("hex");
   const file = `snapshots/snapshot.${sha256}.json.gz`;
