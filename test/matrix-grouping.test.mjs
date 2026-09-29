@@ -3,6 +3,21 @@ import test from "node:test";
 import { matrixHarnessGroup, median, providerMedian } from "../core.mjs";
 import { runBatches } from "../core.mjs";
 
+test("matrix pins baseline first and ranks remaining harnesses best to worst", async () => {
+  const { matrixHarnessOrder } = await import("../modules/matrix.mjs");
+  const scores = { baselineHarness: "baseline-agent", harnesses: new Map([
+    ["baseline-agent", { score: 0.9 }], ["best", { score: 0.99 }],
+    ["worst", { score: 0.7 }], ["middle", { score: 0.95 }],
+    ["rare-best", { score: 0.98 }], ["rare-worst", { score: 0.6 }],
+  ]) };
+  const groupOf = (harness) => harness.startsWith("rare-") ? "Others" : harness;
+  assert.deepEqual(matrixHarnessOrder(
+    ["worst", "rare-worst", "middle", "Others", "best", "rare-best", "baseline-agent"],
+    scores, groupOf,
+  ), ["baseline-agent", "best", "middle", "worst", "Others", "rare-best", "rare-worst"]);
+  assert.deepEqual(matrixHarnessOrder(["worst", "best", "middle"], scores, groupOf),
+    ["best", "middle", "worst"]);
+});
 test("preview loads the newest 50 runs in bounded batches", () => {
   const runs = Array.from({ length: 75 }, (_, index) => index);
   const batches = runBatches(runs, 50);

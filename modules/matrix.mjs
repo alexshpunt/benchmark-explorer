@@ -79,6 +79,23 @@ export function matrixPartialCoverage(rows, total) {
   const count = Math.max(0, ...rows.map((row) => row.taskCount ?? 0));
   return count ? { count: Math.min(count, total), total } : null;
 }
+/** Pin the baseline first, then rank harness blocks and their members by score. */
+export function matrixHarnessOrder(harnesses, baselineScores, groupOf) {
+  const baseline = baselineScores?.baselineHarness ?? "baseline-agent";
+  const score = (harness) => baselineScores?.harnesses.get(harness)?.score ?? -Infinity;
+  const ranked = (left, right) => score(right) - score(left) || left.localeCompare(right);
+  return [...harnesses].sort((left, right) => {
+    if (left === right) return 0;
+    if (left === baseline) return -1;
+    if (right === baseline) return 1;
+    const a = groupOf(left);
+    const b = groupOf(right);
+    if (a !== b) return ranked(a, b);
+    if (left === a) return -1;
+    if (right === b) return 1;
+    return ranked(left, right);
+  });
+}
 /** Create the matrix with shared state and actions supplied by the entry point. */
 export function createMatrix(state, {
   mean, COLORS, selectedValues, syncUrl, render, renderMatrixState,
@@ -393,14 +410,15 @@ export function createMatrix(state, {
     for (const cell of cells) {
       byHarness.set(cell.harness, [...(byHarness.get(cell.harness) ?? []), cell]);
     }
-    const rankByHarness = new Map([...byHarness.keys()].map((harness) =>
-      [harness, state.baselineScores?.harnesses.get(harness)?.score]));
-    const harnessOrder = [...byHarness.keys()].sort((left, right) => {
-      const a = harnessGroup(left);
-      const b = harnessGroup(right);
-      if (a === b) return left === a ? -1 : right === b ? 1 : left.localeCompare(right);
-      return (rankByHarness.get(b) ?? -1) - (rankByHarness.get(a) ?? -1) || a.localeCompare(b);
-    });
+    const orderingScores = { ...state.baselineScores,
+      harnesses: new Map(state.baselineScores?.harnesses ?? []) };
+    for (const [harness, members] of byHarness) {
+      if (!members.some((cell) => cell.groupedHarness)) continue;
+      const families = [...new Set(members.flatMap(rowsForCell).map((row) => row.harnessFamily))];
+      if (families.length === 1 && orderingScores.harnesses.has(families[0]))
+        orderingScores.harnesses.set(harness, orderingScores.harnesses.get(families[0]));
+    }
+    const harnessOrder = matrixHarnessOrder([...byHarness.keys()], orderingScores, harnessGroup);
     const harnesses = harnessOrder.flatMap((harness) => {
       const unique = [
         ...new Map(byHarness.get(harness).map((cell) => [cell.columnKey, cell])).values(),
@@ -570,7 +588,7 @@ export function createMatrix(state, {
     for (const column of series) {
       const summary = matrixAcrossModels(cells, column, rowsForCell);
       if (summary && state.matrixMetric === "score") {
-        const members = [...new Set(rowsForCell(column).map((row) => row.harnessFamily))];
+        const members = [...new Set(rowsForCell(summary).map((row) => row.harnessFamily))];
         const harness = column.groupedHarness && members.length === 1 ? members[0] : column.harness;
         const rating = state.baselineScores?.harnesses.get(harness);
         const rated = rating && (!column.groupedHarness || members.length === 1) &&
