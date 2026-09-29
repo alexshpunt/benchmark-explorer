@@ -47,11 +47,12 @@ export function acceptedRunHighlights(runs, rows, commits, batchedDates = new Ma
   const dates = new Map(commits
     .filter((commit) => commit.title?.startsWith("Accept benchmark observation "))
     .map((commit) => [commit.title.slice("Accept benchmark observation ".length), commit.date]));
-  return runs.map(({ runId }) => {
+  return runs.map(({ runId, submittedBy }) => {
     const acceptedAt = dates.get(runId) ?? batchedDates.get(runId);
     if (!acceptedAt || !Number.isFinite(Date.parse(acceptedAt)))
       throw Error(`Missing Dataset acceptance date for ${runId}`);
     return {
+      ...(submittedBy ? { submittedBy } : {}),
       runId,
       acceptedAt,
       score: median(rows.filter((row) => row.runId === runId && row.fullBenchmark)
