@@ -209,7 +209,7 @@ export function createFilters(state, {
     }
     const grouping = document.createElement("div");
     grouping.className = "matrix-group-options";
-    for (const [value, label] of [["model", "Group models by family"], ["harness", "Group DeepSeek harnesses"], ["extension", "Group pi-extensions"]]) {
+    for (const [value, label] of [["model", "Group models by family"], ["harness", "Group rare harnesses"], ["extension", "Group pi-extensions"]]) {
       const option = document.createElement("label");
       const check = document.createElement("input");
       check.type = "checkbox";

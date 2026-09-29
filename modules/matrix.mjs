@@ -1,5 +1,5 @@
 import {
-  aggregateGroupScore, compareHarnessVersions, matrixHarnessGroup, median,
+  aggregateGroupScore, compareHarnessVersions, matrixHarnessGroup, matrixHarnessRunCounts, median,
   modelRouteIdentity, observedMetricAverage, providerMedian,
   qualityPerDollar, relativeQualityPosition,
 } from "../core.mjs";
@@ -84,6 +84,15 @@ export function createMatrix(state, {
   mean, COLORS, selectedValues, syncUrl, render, renderMatrixState,
   openModelDetails, openHarnessDetails,
 }) {
+  let groupingSnapshot;
+  let harnessRunCounts;
+  function harnessGroup(harness) {
+    if (groupingSnapshot !== state.snapshot || !harnessRunCounts) {
+      groupingSnapshot = state.snapshot;
+      harnessRunCounts = matrixHarnessRunCounts(state.snapshot?.runRows?.all ?? []);
+    }
+    return matrixHarnessGroup(harness, harnessRunCounts);
+  }
   function cellKey(model, harness, version) {
     return JSON.stringify([model, harness, version ?? null]);
   }
@@ -270,9 +279,9 @@ export function createMatrix(state, {
   }
 
   function matrixGroupFilterButton(group) {
-    const harnesses = new Set(state.configurations
+    const harnesses = new Set((state.snapshot?.runRows?.all ?? [])
       .map((row) => row.harnessFamily)
-      .filter((harness) => matrixHarnessGroup(harness) === group));
+      .filter((harness) => harnessGroup(harness) === group));
     const selected = selectedValues("harness");
     const active = selected.size === harnesses.size && [...harnesses].every((value) => selected.has(value));
     const button = matrixFilterButton("harness", group, group).cloneNode(true);
@@ -326,8 +335,8 @@ export function createMatrix(state, {
     const columnGroups = new Map();
     for (const cell of cells) {
       if (!cell.compact) continue;
-      const label = matrixHarnessGroup(cell.harness);
-      if ((label === "DeepSeek" && harnesses) || (label === "pi-extensions" && extensions)) {
+      const label = harnessGroup(cell.harness);
+      if ((label === "Others" && harnesses) || (label === "pi-extensions" && extensions)) {
         const key = JSON.stringify([cell.model, label]);
         columnGroups.set(key, [...(columnGroups.get(key) ?? []), cell]);
       }
@@ -361,8 +370,8 @@ export function createMatrix(state, {
     }
     return [...groups.values()].filter((cell) => {
       if (models && cell.model.includes("\t") && !state.expandedModels.has(cell.model.split("\t")[0])) return false;
-      const group = matrixHarnessGroup(cell.harness);
-      if (cell.columnKey !== group && ((group === "DeepSeek" && harnesses) ||
+      const group = harnessGroup(cell.harness);
+      if (cell.columnKey !== group && ((group === "Others" && harnesses) ||
         (group === "pi-extensions" && extensions)) && !state.expandedMatrixGroups.has(group)) return false;
       return true;
     });
@@ -387,8 +396,8 @@ export function createMatrix(state, {
     const rankByHarness = new Map([...byHarness.keys()].map((harness) =>
       [harness, state.baselineScores?.harnesses.get(harness)?.score]));
     const harnessOrder = [...byHarness.keys()].sort((left, right) => {
-      const a = matrixHarnessGroup(left);
-      const b = matrixHarnessGroup(right);
+      const a = harnessGroup(left);
+      const b = harnessGroup(right);
       if (a === b) return left === a ? -1 : right === b ? 1 : left.localeCompare(right);
       return (rankByHarness.get(b) ?? -1) - (rankByHarness.get(a) ?? -1) || a.localeCompare(b);
     });
@@ -422,13 +431,13 @@ export function createMatrix(state, {
       const th = document.createElement("th");
       th.scope = "col";
       const expanded = state.expandedHarnesses.has(seriesCell.harness);
-      const group = matrixHarnessGroup(seriesCell.harness);
-      const inExpandedGroup = (group === "DeepSeek" || group === "pi-extensions") &&
+      const group = harnessGroup(seriesCell.harness);
+      const inExpandedGroup = (group === "Others" || group === "pi-extensions") &&
         state.expandedMatrixGroups.has(group) && state.matrixGroups.has(
-          group === "DeepSeek" ? "harness" : "extension");
+          group === "Others" ? "harness" : "extension");
       th.classList.toggle("matrix-expanded-head", expanded || inExpandedGroup ||
         (seriesCell.grouped && state.expandedMatrixGroups.has(seriesCell.harness)));
-      th.title = ["DeepSeek", "pi-extensions"].includes(seriesCell.harness)
+      th.title = ["Others", "pi-extensions"].includes(seriesCell.harness)
         ? `${seriesCell.harness}\nMedian across the group's harnesses per provider route`
         : seriesCell.compact
           ? `${seriesCell.harness}\nMedian score across available versions for each model route`
@@ -444,12 +453,12 @@ export function createMatrix(state, {
       columnButton.append(columnLabel);
       const detailsVersion = seriesCell.compact ? null : seriesCell.version;
       columnButton.title = `Open ${seriesCell.compact ? seriesCell.harness : seriesCell.label}`;
-      if (!seriesCell.grouped || !["DeepSeek", "pi-extensions"].includes(seriesCell.harness))
+      if (!seriesCell.grouped || !["Others", "pi-extensions"].includes(seriesCell.harness))
         columnButton.addEventListener("click", () => openHarnessDetails(seriesCell.harness, detailsVersion));
       th.append(columnButton);
       const actions = document.createElement("span");
       actions.className = "matrix-header-actions";
-      if (seriesCell.grouped && ["DeepSeek", "pi-extensions"].includes(seriesCell.harness)) {
+      if (seriesCell.grouped && ["Others", "pi-extensions"].includes(seriesCell.harness)) {
         const toggle = document.createElement("button");
         toggle.type = "button";
         toggle.className = "matrix-expand-toggle";
@@ -464,12 +473,14 @@ export function createMatrix(state, {
           syncUrl(true);
         });
         actions.append(toggle, matrixGroupFilterButton(seriesCell.harness));
+        columnButton.title = toggle.getAttribute("aria-label");
+        columnButton.addEventListener("click", () => toggle.click());
       } else if (seriesCell.compact) actions.append(matrixExpansionButton(seriesCell.harness));
       const filterName = seriesCell.compact ? "harness" : "harnessVersion";
       const filterValue = seriesCell.compact
         ? seriesCell.harness
         : seriesCell.harness + "\t" + seriesCell.version;
-      if (!seriesCell.grouped || !["DeepSeek", "pi-extensions"].includes(seriesCell.harness)) actions.append(
+      if (!seriesCell.grouped || !["Others", "pi-extensions"].includes(seriesCell.harness)) actions.append(
         matrixFilterButton(
           filterName,
           filterValue,

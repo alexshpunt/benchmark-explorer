@@ -12,12 +12,26 @@ export function providerMedian(cells, field) {
     routes.set(cell.model, [...(routes.get(cell.model) ?? []), cell[field]]);
   return median([...routes.values()].map(median));
 }
-/** Match the dataset's DeepSeek modes and Pi extension harness families. */
-export function matrixHarnessGroup(harness) {
-  if (/^dsh-(?:code|standard)$/i.test(harness)) return "DeepSeek";
-  if (/pi-(?:extensions|hashline-edit)/i.test(harness)) return "pi-extensions";
-  if (harness.startsWith("pi-") && !["pi-default", "pi-agent-ide"].includes(harness)) return "pi-extensions";
-  return harness;
+/** Count unique full accepted runs per harness across the published Dataset. */
+export function matrixHarnessRunCounts(rows) {
+  const runs = new Map();
+  for (const row of rows) {
+    if (row.fullBenchmark !== true || !Number.isFinite(row.score)) continue;
+    const ids = runs.get(row.harnessFamily) ?? new Set();
+    ids.add(row.runId);
+    runs.set(row.harnessFamily, ids);
+  }
+  return new Map([...runs].map(([harness, ids]) => [harness, ids.size]));
+}
+
+/** Keep established harnesses separate and collapse rare ones into expandable groups. */
+export function matrixHarnessGroup(harness, counts) {
+  if (["pi-extensions", "Others"].includes(harness)) return harness;
+  if ((counts.get(harness) ?? 0) > 3) return harness;
+  if (/pi-(?:extensions|hashline-edit)/i.test(harness) ||
+      (harness.startsWith("pi-") && !["pi-default", "pi-agent-ide"].includes(harness)))
+    return "pi-extensions";
+  return "Others";
 }
 
 /** Split accepted runs into bounded batches, using the newest runs in preview mode. */

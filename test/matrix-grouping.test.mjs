@@ -27,13 +27,19 @@ test("collapsed cells give each provider one vote even with multiple harness col
   ];
   assert.equal(providerMedian(cells, "score"), 0.6);
 });
-test("dataset harness IDs identify the two DeepSeek modes and Pi extensions", () => {
-  assert.equal(matrixHarnessGroup("dsh-code"), "DeepSeek");
-  assert.equal(matrixHarnessGroup("dsh-standard"), "DeepSeek");
-  assert.equal(matrixHarnessGroup("pi-hashline-edit"), "pi-extensions");
-  assert.equal(matrixHarnessGroup("d3ara1n-pi-hashline-edit"), "pi-extensions");
-  assert.equal(matrixHarnessGroup("personal-pi-extensions-opencode"), "pi-extensions");
-  assert.equal(matrixHarnessGroup("pi-default"), "pi-default");
-  assert.equal(matrixHarnessGroup("pi-agent-ide"), "pi-agent-ide");
-  assert.equal(matrixHarnessGroup("codex-cli-default"), "codex-cli-default");
+test("rare harness groups count unique full runs with a strict >3 threshold", async () => {
+  const { matrixHarnessRunCounts } = await import("../core.mjs");
+  const rows = ["dsh-code", "dsh-standard", "pi-hashline-edit", "pi-better-edit", "codex-cli-default"]
+    .flatMap((harnessFamily, index) => Array.from({ length: index === 3 ? 4 : 3 }, (_, runId) =>
+      ({ harnessFamily, runId: harnessFamily + runId, fullBenchmark: true, score: 0.9 })));
+  rows.push({ ...rows[0] }, { ...rows[0], runId: "partial", fullBenchmark: false });
+  const counts = matrixHarnessRunCounts(rows);
+  assert.equal(counts.get("dsh-code"), 3);
+  assert.equal(matrixHarnessGroup("dsh-code", counts), "Others");
+  assert.equal(matrixHarnessGroup("dsh-standard", counts), "Others");
+  assert.equal(matrixHarnessGroup("pi-hashline-edit", counts), "pi-extensions");
+  assert.equal(matrixHarnessGroup("pi-better-edit", counts), "pi-better-edit");
+  assert.equal(matrixHarnessGroup("codex-cli-default", counts), "Others");
+  counts.set("dsh-code", 4);
+  assert.equal(matrixHarnessGroup("dsh-code", counts), "dsh-code");
 });
