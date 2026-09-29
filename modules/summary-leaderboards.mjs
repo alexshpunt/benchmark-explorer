@@ -123,6 +123,6 @@ export function createSummaryLeaderboards(openConfigurationDetails) {
         }, String(cell)),
       }));
     }
-    select(document.querySelector("[data-summary-tab][aria-selected=\"true\"]")?.dataset.summaryTab ?? "models");
+    select(document.querySelector("[data-summary-tab][aria-selected=\"true\"]")?.dataset.summaryTab ?? "combinations");
   };
 }

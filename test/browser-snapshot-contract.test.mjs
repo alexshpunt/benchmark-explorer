@@ -28,6 +28,18 @@ test("published page includes every split browser asset", async () => {
   assert.match(workflow, /cp -R modules styles \.space\//);
 });
 
+test("summary and run tables keep their intended page order", async () => {
+  const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
+  const combinations = html.indexOf('data-summary-tab="combinations"');
+  const models = html.indexOf('data-summary-tab="models"');
+  const matrix = html.indexOf('class="summary-row"');
+  const pareto = html.indexOf('class="pareto-panel"');
+  const runs = html.indexOf('id="results-view"');
+  assert.ok(combinations >= 0 && combinations < models);
+  assert.match(html, /data-summary-tab="combinations"[^>]*aria-selected="true"/);
+  assert.ok(matrix >= 0 && matrix < pareto && pareto < runs);
+});
+
 test("every custom overlay supports light dismiss", async () => {
   const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
   const app = await readFile(new URL("../app.mjs", import.meta.url), "utf8");

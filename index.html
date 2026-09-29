@@ -74,24 +74,23 @@
             <p>Full runs only. Each model–harness pair uses its latest available harness version.</p>
           </div>
           <div class="summary-tabs" role="tablist" aria-label="Leaderboard view">
-            <button type="button" role="tab" data-summary-tab="models" aria-controls="summary-models" aria-selected="true">Models</button>
+            <button type="button" role="tab" data-summary-tab="combinations" aria-controls="summary-combinations" aria-selected="true">Model + harness</button>
+            <button type="button" role="tab" data-summary-tab="models" aria-controls="summary-models" aria-selected="false" tabindex="-1">Models</button>
             <button type="button" role="tab" data-summary-tab="harnesses" aria-controls="summary-harnesses" aria-selected="false" tabindex="-1">Harnesses</button>
-            <button type="button" role="tab" data-summary-tab="combinations" aria-controls="summary-combinations" aria-selected="false" tabindex="-1">Model + harness</button>
           </div>
         </div>
         <p class="summary-method">Combination score is the median of its runs. Model and harness scores are medians of combination scores.</p>
-        <div id="summary-models" class="summary-table-panel" role="tabpanel" data-summary-panel="models">
+        <div id="summary-combinations" class="summary-table-panel" role="tabpanel" data-summary-panel="combinations">
+          <div data-summary-grid="combinations"></div>
+        </div>
+        <div id="summary-models" class="summary-table-panel" role="tabpanel" data-summary-panel="models" hidden>
           <div data-summary-grid="models"></div>
         </div>
         <div id="summary-harnesses" class="summary-table-panel" role="tabpanel" data-summary-panel="harnesses" hidden>
           <div data-summary-grid="harnesses"></div>
         </div>
-        <div id="summary-combinations" class="summary-table-panel" role="tabpanel" data-summary-panel="combinations" hidden>
-          <div data-summary-grid="combinations"></div>
-        </div>
       </section>
       <section class="explorer-toolbar" aria-label="Explorer controls">
-        <h2 class="toolbar-title">Runs</h2>
         <div class="view-actions">
           <a
             class="icon-button resource-link"
@@ -120,38 +119,6 @@
         </div>
       </section>
 
-      <section id="results-view" class="results-section" aria-label="Runs">
-        <div class="results-subhead">
-          <p>
-            Sort or filter accepted configurations. Scroll within the table for more runs; select
-            a cell to see its sources.
-          </p>
-          <div class="results-controls">
-            <div id="range-filters" class="active-filters" aria-label="Active range filters"></div>
-            <details id="column-settings" class="column-settings" data-overlay>
-              <summary>Columns</summary>
-              <div class="column-settings-panel">
-                <div class="column-settings-heading">
-                  <strong>Run columns</strong>
-                  <button id="reset-columns" type="button">Reset</button>
-                </div>
-                <p>Drag or use the arrows to reorder. Clear a checkbox to hide a column.</p>
-                <div id="column-settings-list" class="column-settings-list"></div>
-              </div>
-            </details>
-          </div>
-        </div>
-        <details class="table-guide">
-          <summary>How to read this table</summary>
-          <p>
-            Trials are benchmark task executions. Coverage is the number of unique tasks observed
-            out of the benchmark total. Score weights first-attempt exactness more heavily than
-            success after recovery. Select any cell to see how its value was computed, or use the
-            filter button in a column header.
-          </p>
-        </details>
-        <div id="results-grid"></div>
-      </section>
       <section class="status-bar" aria-label="Dataset error" hidden>
         <span class="status-badge">
           <span class="status-dot" aria-hidden="true"></span>
@@ -286,6 +253,41 @@
             ></div>
           </section>
         </div>
+      </section>
+      <section id="results-view" class="results-section" aria-label="Runs">
+        <div class="results-subhead">
+          <div>
+            <h2>Runs</h2>
+            <p>
+              Sort or filter accepted configurations. Scroll within the table for more runs; select
+              a cell to see its sources.
+            </p>
+          </div>
+          <div class="results-controls">
+            <div id="range-filters" class="active-filters" aria-label="Active range filters"></div>
+            <details id="column-settings" class="column-settings" data-overlay>
+              <summary>Columns</summary>
+              <div class="column-settings-panel">
+                <div class="column-settings-heading">
+                  <strong>Run columns</strong>
+                  <button id="reset-columns" type="button">Reset</button>
+                </div>
+                <p>Drag or use the arrows to reorder. Clear a checkbox to hide a column.</p>
+                <div id="column-settings-list" class="column-settings-list"></div>
+              </div>
+            </details>
+          </div>
+        </div>
+        <details class="table-guide">
+          <summary>How to read this table</summary>
+          <p>
+            Trials are benchmark task executions. Coverage is the number of unique tasks observed
+            out of the benchmark total. Score weights first-attempt exactness more heavily than
+            success after recovery. Select any cell to see how its value was computed, or use the
+            filter button in a column header.
+          </p>
+        </details>
+        <div id="results-grid"></div>
       </section>
       <dialog id="additions-dialog" class="additions-dialog" aria-labelledby="additions-dialog-title">
           <header>

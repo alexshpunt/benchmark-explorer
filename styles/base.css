@@ -294,12 +294,22 @@ main {
 /* ----------------------------------------------------------------- toolbar */
 
 .explorer-toolbar {
+  position: sticky;
+  top: 10px;
+  z-index: 20;
   display: flex;
   align-items: center;
   gap: 16px;
-  padding: 16px 0 14px;
-  padding-inline: var(--page-pad);
-  border-bottom: 1px solid var(--border);
+  width: fit-content;
+  max-width: calc(100% - 2 * var(--page-pad));
+  margin: 12px var(--page-pad);
+  margin-left: auto;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--text) 10%, transparent);
+  backdrop-filter: blur(12px);
 }
 .toolbar-heading {
   min-width: 0;
@@ -420,6 +430,11 @@ main {
   padding-inline: var(--page-pad);
   color: var(--muted);
   font-size: var(--text-body);
+}
+.results-subhead h2 {
+  margin: 0 0 2px;
+  color: var(--text);
+  font-size: var(--text-heading);
 }
 .results-subhead p {
   margin: 0;
