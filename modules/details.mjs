@@ -226,6 +226,18 @@ export function createDetails(state, {
       const execution = run?.official?.executionId ? ` · execution ${run.official.executionId}` : "";
       provenance.textContent = `${verification}${execution}`;
       item.append(provenance);
+      if (run?.submittedBy?.profileUrl) {
+        const submitter = document.createElement("p");
+        submitter.className = "details-note";
+        submitter.append("Submitted by ");
+        const profile = document.createElement("a");
+        profile.href = run.submittedBy.profileUrl;
+        profile.target = "_blank";
+        profile.rel = "noreferrer";
+        profile.textContent = `@${run.submittedBy.accountId} ↗`;
+        submitter.append(profile);
+        item.append(submitter);
+      }
       if (run?.official?.proofPath) {
         item.append(
           datasetLink(
