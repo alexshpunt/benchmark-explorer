@@ -27,6 +27,26 @@ test("collapsed cells give each provider one vote even with multiple harness col
   ];
   assert.equal(providerMedian(cells, "score"), 0.6);
 });
+test("batched runs with four or five model results stay outside Others", async () => {
+  const { matrixHarnessRunCounts } = await import("../core.mjs");
+  const rows = [3, 4, 5].flatMap((count) => Array.from({ length: count }, (_, index) => ({
+    harnessFamily: `batch-harness-${count}`,
+    runId: `batch-${count}`,
+    modelFamily: `model-${index}`,
+    provider: "provider",
+    fullBenchmark: true,
+    score: 0.9,
+  })));
+  // Duplicate configurations and reasoning variants cannot inflate the count.
+  rows.push({ ...rows[0] }, { ...rows[0], reasoning: "high" });
+  rows.push({ ...rows[0], modelFamily: "partial-model", fullBenchmark: false });
+  const counts = matrixHarnessRunCounts(rows);
+  for (const count of [3, 4, 5]) {
+    const harness = `batch-harness-${count}`;
+    assert.equal(counts.get(harness), count);
+    assert.equal(matrixHarnessGroup(harness, counts), count > 3 ? harness : "Others");
+  }
+});
 test("rare harness groups count unique full runs with a strict >3 threshold", async () => {
   const { matrixHarnessRunCounts } = await import("../core.mjs");
   const rows = ["dsh-code", "dsh-standard", "pi-hashline-edit", "pi-better-edit", "codex-cli-default"]

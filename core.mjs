@@ -12,13 +12,13 @@ export function providerMedian(cells, field) {
     routes.set(cell.model, [...(routes.get(cell.model) ?? []), cell[field]]);
   return median([...routes.values()].map(median));
 }
-/** Count unique full accepted runs per harness across the published Dataset. */
+/** Count full model-route results per accepted run and harness, including batched runs. */
 export function matrixHarnessRunCounts(rows) {
   const runs = new Map();
   for (const row of rows) {
     if (row.fullBenchmark !== true || !Number.isFinite(row.score)) continue;
     const ids = runs.get(row.harnessFamily) ?? new Set();
-    ids.add(row.runId);
+    ids.add(JSON.stringify([row.runId, modelRouteIdentity(row)]));
     runs.set(row.harnessFamily, ids);
   }
   return new Map([...runs].map(([harness, ids]) => [harness, ids.size]));
