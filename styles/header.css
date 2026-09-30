@@ -123,7 +123,7 @@
 }
 .editorial-recent-list a {
   display: grid;
-  grid-template-columns: 62px 4px 92px 4px minmax(0, 1fr) 12px;
+  grid-template-columns: 72px 4px 92px 4px minmax(0, 1fr) 12px;
   align-items: center;
   gap: 8px;
   margin-inline: -10px;
@@ -190,7 +190,7 @@
     padding: 24px var(--page-pad);
   }
   .editorial-recent-list a {
-    grid-template-columns: 53px 4px 69px 4px minmax(0, 1fr) 10px;
+    grid-template-columns: 62px 4px 69px 4px minmax(0, 1fr) 10px;
     gap: 5px;
   }
   .editorial-recent-list .recent-score {

@@ -3,6 +3,31 @@ import test from "node:test";
 import { matrixHarnessGroup, median, providerMedian } from "../core.mjs";
 import { runBatches } from "../core.mjs";
 
+test("matrix groups only multiple visible routes or harnesses, including after baseline restriction", async () => {
+  const { createMatrix } = await import("../modules/matrix.mjs");
+  const state = { snapshot: { runRows: { all: [] } }, matrixGroups: new Set(["model", "harness", "extension"]),
+    expandedModels: new Set(["m"]), expandedMatrixGroups: new Set(["Others"]), configurations: [], matrixBaselineOnly: false };
+  const { groupedMatrixCells } = createMatrix(state, {});
+  const cell = (model, harness) => ({ model, harness, columnKey: harness, compact: true, key: model + harness,
+    score: 0.8, sourceRows: [], observations: 1, costObservations: 0, tokenObservations: 0 });
+  const single = cell("m\tp", "rare");
+  assert.deepEqual(groupedMatrixCells([single]), [single]);
+  // Multiple columns do not make a single provider a model group.
+  const other = cell("m\tp", "rare-two");
+  const harnessGrouped = groupedMatrixCells([single, other]);
+  assert.ok(harnessGrouped.some((row) => row.harness === "Others"));
+  assert.ok(harnessGrouped.every((row) => row.model === "m\tp"));
+  const secondRoute = cell("m\tq", "rare");
+  assert.ok(groupedMatrixCells([single, secondRoute]).some((row) => row.model === "m"));
+  state.expandedModels.clear();
+  assert.deepEqual(groupedMatrixCells([single, secondRoute]).map((row) => row.model), ["m"]);
+  state.matrixBaselineOnly = true;
+  state.baselineScores = { baselines: new Map([["m\tp", {}]]) };
+  assert.deepEqual(groupedMatrixCells([single, secondRoute]), [single]);
+  state.matrixBaselineOnly = false;
+  state.matrixGroups.clear();
+  assert.deepEqual(groupedMatrixCells([single, secondRoute]), [single, secondRoute]);
+});
 test("matrix pins baseline first and ranks remaining harnesses best to worst", async () => {
   const { matrixHarnessOrder } = await import("../modules/matrix.mjs");
   const scores = { baselineHarness: "baseline-agent", harnesses: new Map([

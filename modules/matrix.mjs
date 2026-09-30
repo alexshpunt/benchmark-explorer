@@ -355,6 +355,19 @@ export function createMatrix(state, {
     const models = state.matrixGroups.has("model");
     const harnesses = state.matrixGroups.has("harness");
     const extensions = state.matrixGroups.has("extension");
+    const routes = new Map();
+    const groupedHarnesses = new Map();
+    for (const cell of cells) {
+      const family = cell.model.split("\t")[0];
+      if (!routes.has(family)) routes.set(family, new Set());
+      routes.get(family).add(cell.model);
+      const group = harnessGroup(cell.harness);
+      if (!groupedHarnesses.has(group)) groupedHarnesses.set(group, new Set());
+      groupedHarnesses.get(group).add(cell.harness);
+    }
+    const hasModelGroup = (family) => models && routes.get(family)?.size > 1;
+    const hasHarnessGroup = (label) => groupedHarnesses.get(label)?.size > 1 &&
+      ((label === "Others" && harnesses) || (label === "pi-extensions" && extensions));
     const groups = new Map();
     const add = (cell) => groups.set(JSON.stringify([cell.model, cell.columnKey]), cell);
     for (const cell of cells) add(cell);
@@ -362,7 +375,7 @@ export function createMatrix(state, {
     for (const cell of cells) {
       if (!cell.compact) continue;
       const label = harnessGroup(cell.harness);
-      if ((label === "Others" && harnesses) || (label === "pi-extensions" && extensions)) {
+      if (hasHarnessGroup(label)) {
         const key = JSON.stringify([cell.model, label]);
         columnGroups.set(key, [...(columnGroups.get(key) ?? []), cell]);
       }
@@ -386,6 +399,7 @@ export function createMatrix(state, {
       const familyGroups = new Map();
       for (const cell of groups.values()) {
         const family = cell.model.split("\t")[0];
+        if (!hasModelGroup(family)) continue;
         const key = JSON.stringify([family, cell.columnKey]);
         familyGroups.set(key, [...(familyGroups.get(key) ?? []), cell]);
       }
@@ -395,10 +409,10 @@ export function createMatrix(state, {
       }
     }
     return [...groups.values()].filter((cell) => {
-      if (models && cell.model.includes("\t") && !state.expandedModels.has(cell.model.split("\t")[0])) return false;
+      if (hasModelGroup(cell.model.split("\t")[0]) && cell.model.includes("\t") &&
+        !state.expandedModels.has(cell.model.split("\t")[0])) return false;
       const group = harnessGroup(cell.harness);
-      if (cell.columnKey !== group && ((group === "Others" && harnesses) ||
-        (group === "pi-extensions" && extensions)) && !state.expandedMatrixGroups.has(group)) return false;
+      if (cell.columnKey !== group && hasHarnessGroup(group) && !state.expandedMatrixGroups.has(group)) return false;
       return true;
     });
   }
@@ -428,11 +442,19 @@ export function createMatrix(state, {
         orderingScores.harnesses.set(harness, orderingScores.harnesses.get(families[0]));
     }
     const harnessOrder = matrixHarnessOrder([...byHarness.keys()], orderingScores, harnessGroup);
+    const visibleRoutes = new Set(cells.flatMap((cell) => rowsForCell(cell).map(modelRouteIdentity)));
+    const versionsByHarness = new Map();
+    for (const row of state.configurations) {
+      if (!visibleRoutes.has(modelRouteIdentity(row))) continue;
+      if (!versionsByHarness.has(row.harnessFamily)) versionsByHarness.set(row.harnessFamily, new Set());
+      versionsByHarness.get(row.harnessFamily).add(row.harnessVersion ?? "");
+    }
+    const canExpandHarness = (harness) => versionsByHarness.get(harness)?.size > 1;
     const harnesses = harnessOrder.flatMap((harness) => {
       const unique = [
         ...new Map(byHarness.get(harness).map((cell) => [cell.columnKey, cell])).values(),
       ];
-      return state.expandedHarnesses.has(harness)
+      return state.expandedHarnesses.has(harness) && canExpandHarness(harness)
         ? unique.sort((left, right) =>
             Number(right.compact) - Number(left.compact) ||
             compareHarnessVersions(right.version ?? "", left.version ?? ""))
@@ -457,9 +479,9 @@ export function createMatrix(state, {
     for (const seriesCell of series) {
       const th = document.createElement("th");
       th.scope = "col";
-      const expanded = state.expandedHarnesses.has(seriesCell.harness);
+      const expanded = state.expandedHarnesses.has(seriesCell.harness) && canExpandHarness(seriesCell.harness);
       const group = harnessGroup(seriesCell.harness);
-      const inExpandedGroup = (group === "Others" || group === "pi-extensions") &&
+      const inExpandedGroup = byHarness.has(group) && (group === "Others" || group === "pi-extensions") &&
         state.expandedMatrixGroups.has(group) && state.matrixGroups.has(
           group === "Others" ? "harness" : "extension");
       th.classList.toggle("matrix-expanded-head", expanded || inExpandedGroup ||
@@ -502,7 +524,9 @@ export function createMatrix(state, {
         actions.append(toggle, matrixGroupFilterButton(seriesCell.harness));
         columnButton.title = toggle.getAttribute("aria-label");
         columnButton.addEventListener("click", () => toggle.click());
-      } else if (seriesCell.compact) actions.append(matrixExpansionButton(seriesCell.harness));
+      } else if (seriesCell.compact && canExpandHarness(seriesCell.harness)) {
+        actions.append(matrixExpansionButton(seriesCell.harness));
+      }
       const filterName = seriesCell.compact ? "harness" : "harnessVersion";
       const filterValue = seriesCell.compact
         ? seriesCell.harness
@@ -625,7 +649,7 @@ export function createMatrix(state, {
       const [modelFamily, provider] = model.split("\t");
       const modelLabel = provider ? `${modelFamily} · ${provider}` : modelFamily;
       heading.classList.toggle("matrix-expanded-model",
-        state.matrixGroups.has("model") && state.expandedModels.has(modelFamily));
+        state.matrixGroups.has("model") && models.includes(modelFamily) && state.expandedModels.has(modelFamily));
       heading.title = `Open ${modelLabel}`;
       const rowButton = document.createElement("button");
       rowButton.type = "button";

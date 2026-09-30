@@ -36,6 +36,23 @@ test("header card links show one relevant panel without rebuilding contributor e
     }
   } finally { globalThis.document = previous; }
 });
+test("time estimate uses concurrency ten and keeps the measured sum and caveat", async () => {
+  const { renderCommunity } = await import("../modules/community.mjs");
+  const nodes = new Map();
+  const previous = globalThis.document;
+  globalThis.document = { querySelector: (selector) => {
+    if (!nodes.has(selector)) nodes.set(selector, { textContent: "", replaceChildren() {} });
+    return nodes.get(selector);
+  } };
+  try {
+    renderCommunity({ index: { runs: [] }, runRows: { all: [row("r", "m", 1, 5880)] } }, () => {});
+    assert.match(nodes.get("#community-time").textContent, /≈10 min typical/);
+    assert.match(nodes.get("#community-summed-time").textContent, /98 min median/);
+    assert.match(nodes.get("#community-samples").textContent, /concurrency 10/);
+    assert.match(nodes.get("#community-samples").textContent, /not measured elapsed time/);
+    assert.match(nodes.get("#community-cost").textContent, /\$1.00 typical/);
+  } finally { globalThis.document = previous; }
+});
 test("typical ranges exclude invalid and zero totals and use P10–P90, not extremes", () => {
   assert.deepEqual(typicalRange([0, null, NaN, -1, 1, 2, 3, 4, 100]),
     { median: 3, low: 1.4, high: 61.60000000000001, count: 5 });

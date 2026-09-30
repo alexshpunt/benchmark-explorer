@@ -47,7 +47,7 @@ export function communityOverview(snapshot) {
 export function installCommunityCards() {
   const dialog = document.querySelector("#community-dialog");
   const titles = { participate: "Run the benchmark and contribute", contributors: "Community contributors",
-    cost: "Full model run cost", time: "Summed task time", method: "What we measure and how scores work", news: "News and what comes next" };
+    cost: "Full model run cost", time: "Estimated run time · concurrency 10", method: "What we measure and how scores work", news: "News and what comes next" };
   document.querySelectorAll("[data-community-card]").forEach((button) => {
     button.addEventListener("click", () => {
       const key = button.dataset.communityCard;
@@ -66,15 +66,18 @@ export function installCommunityCards() {
 export function renderCommunity(snapshot, openRun) {
   const overview = communityOverview(snapshot);
   const money = (value) => `$${value.toFixed(2)}`;
-  const time = (value) => `${Math.round(value / 60)} min`;
+  const time = (value) => `≈${Math.round(value / 600)} min`;
   for (const [id, data, format] of [["community-cost", overview.cost, money], ["community-time", overview.duration, time]]) {
     const host = document.querySelector(`#${id}`);
     host.textContent = data ? `${format(data.median)} typical · ${format(data.low)}–${format(data.high)}*` : "Not enough measured data";
     host.title = data ? `Median and P10–P90 from ${data.count} fully measured positive results` : "No eligible measurements";
   }
   document.querySelector("#community-samples").textContent =
-    `Cost: ${overview.cost?.count ?? 0} results. Time: ${overview.duration?.count ?? 0} results. Time is summed task duration, not elapsed wall time. Zeros and incomplete measurements are excluded. P10–P90 omits the outer 10% at each end; it is not a minimum or maximum.`;
+    `Cost: ${overview.cost?.count ?? 0} results. Time: ${overview.duration?.count ?? 0} results. Run time is estimated as summed task duration ÷ 10, assuming concurrency 10 with all slots busy. It is not measured elapsed time. Uneven task durations, the final tasks, rate limits, and overhead can make real runs take longer. Zeros and incomplete measurements are excluded. P10–P90 omits the outer 10% at each end; it is not a minimum or maximum.`;
   const list = document.querySelector("#community-contributors");
+  document.querySelector("#community-summed-time").textContent = overview.duration
+    ? `Original summed task time: ${Math.round(overview.duration.median / 60)} min median · ${Math.round(overview.duration.low / 60)}–${Math.round(overview.duration.high / 60)} min P10–P90.`
+    : "No fully measured task time available.";
   document.querySelector("#community-people-count").textContent = `${overview.contributors.length} community contributors`;
 
   list.replaceChildren();

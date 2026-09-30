@@ -61,9 +61,9 @@ export function acceptedRunHighlights(runs, rows, commits, batchedDates = new Ma
   }).sort((left, right) => Date.parse(right.acceptedAt) - Date.parse(left.acceptedAt));
 }
 
-/** Give the three newest accepted runs their commit dates and full-run median scores. */
+/** Give up to eight newest accepted runs their commit dates and full-run median scores. */
 export function recentRunHighlights(runs, rows, commits, batchedDates = new Map()) {
-  return acceptedRunHighlights(runs.slice(-3), rows, commits, batchedDates).slice(0, 3);
+  return acceptedRunHighlights(runs, rows, commits, batchedDates).slice(0, 8);
 }
 /** Build one revision-pinned, checked Explorer artifact from accepted Dataset files. */
 export async function buildSnapshot({ dataset = "https://huggingface.co/datasets/alexshpunt/explicit-edit-benchmark",
@@ -128,7 +128,7 @@ export async function buildSnapshot({ dataset = "https://huggingface.co/datasets
     const missing = runIds.filter((id) => !explicit.has(id));
     const batched = missing.length ? await batchedRunDates(missing, commits, dataset, fetcher) : new Map();
     acceptedRuns = acceptedRunHighlights(index.runs, runRows.all, commits, batched);
-    recentRuns = acceptedRuns.slice(0, 3);
+    recentRuns = acceptedRuns.slice(0, 8);
   }
   const snapshot = { schemaVersion: 1, revision, index, views, runRows, acceptedRuns, recentRuns, ...evidence };
   const bytes = gzipSync(JSON.stringify(snapshot), { level: 9, mtime: 0 });

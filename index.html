@@ -55,7 +55,7 @@
           <span class="community-header-links"><button type="button" class="community-text-link" data-community-card="method">How scores work</button><button type="button" class="community-text-link" data-community-card="news">News</button></span>
           <div class="community-estimates" aria-label="Typical full model run">
             <button type="button" data-community-card="cost"><span>Full model run cost</span><strong id="community-cost">Loading…</strong></button>
-            <button type="button" data-community-card="time"><span>Summed task time</span><strong id="community-time">Loading…</strong></button>
+            <button type="button" data-community-card="time"><span>Estimated run time · concurrency 10</span><strong id="community-time">Loading…</strong></button>
           </div>
           <a class="editorial-count" href="#results-view" aria-label="Browse all published runs">
             <span class="editorial-count-dot" aria-hidden="true"></span>
@@ -115,13 +115,13 @@
               <li><strong>Model + harness:</strong> median full-run score of the latest complete harness version, selected separately for each model-provider route.</li>
               <li><strong>Model:</strong> median of its harness-combination scores. Every harness has one vote; extra repeats cannot increase its weight.</li>
               <li><strong>Harness:</strong> baseline mean plus the sum of measured differences divided by the fixed number of baseline routes. Unmeasured routes contribute zero change. Routes without a full baseline result are excluded; real zero scores are not missing.</li>
-              <li><strong>Matrix:</strong> baseline routes are shown by default. Harnesses with more than three full model-route results get separate columns; rarer Pi extensions share pi-extensions, and other rare harnesses share Others. Expand either group to inspect its members.</li>
+              <li><strong>Matrix:</strong> baseline routes are shown by default. Harnesses with more than three full model-route results get separate columns; rarer Pi extensions share pi-extensions, and other rare harnesses share Others. Groups with multiple visible members can be expanded. Single provider routes, single harness groups, and harnesses with one visible version stay direct.</li>
             </ul>
             <p>Only complete accepted results enter ratings. Missing cells remain missing; baseline substitution happens only in harness totals. Coverage tells you how many baseline routes were actually measured.</p>
           </div>
         </section>
         <section data-community-panel="measurements" hidden>
-          <div><p>Header estimates describe one full model × provider × harness × reasoning result, not a multi-model batch. They show the median and P10–P90 of positive, fully measured totals in the published snapshot. Prices depend on the model, provider, and harness.</p><p id="community-samples">Loading measured samples…</p></div>
+          <div><p>Header estimates describe one full model × provider × harness × reasoning result, not a multi-model batch. They show the median and P10–P90 of positive, fully measured totals in the published snapshot. Prices depend on the model, provider, and harness.</p><p id="community-samples">Loading measured samples…</p><p id="community-summed-time"></p></div>
         </section>
         <section data-community-panel="contributors" hidden>
           <div><p>Ranked by full accepted model results. Each model inside a batch counts separately. Only results attributed to a contributor in the Dataset are listed; this is not a ranking of GitHub code contributions.</p><ol id="community-contributors"><li>Loading contributors…</li></ol></div>

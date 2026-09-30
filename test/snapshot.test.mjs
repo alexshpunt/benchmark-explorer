@@ -112,6 +112,14 @@ test("all accepted runs are sorted newest first with their full-run score", () =
   ]);
 });
 
+test("recent highlights keep the newest eight by acceptance date, not index order", () => {
+  const runs = Array.from({ length: 10 }, (_, index) => ({ runId: `r${index}` })).reverse();
+  const commits = runs.map(({ runId }) => ({ title: `Accept benchmark observation ${runId}`,
+    date: `2026-09-${String(10 + Number(runId.slice(1))).padStart(2, "0")}T12:00:00.000Z` }));
+  assert.deepEqual(recentRunHighlights(runs, [], commits).map((run) => run.runId),
+    ["r9", "r8", "r7", "r6", "r5", "r4", "r3", "r2"]);
+});
+
 test("recent runs use their dataset acceptance date and median of full scores", () => {
   const runs = ["older", "multi", "partial", "newest"].map((runId) => ({ runId }));
   const rows = [
@@ -125,11 +133,13 @@ test("recent runs use their dataset acceptance date and median of full scores", 
     { title: "Accept benchmark observation newest", date: "2026-09-27T12:00:00.000Z" },
     { title: "Accept benchmark observation partial", date: "2026-09-26T12:00:00.000Z" },
     { title: "Accept benchmark observation multi", date: "2026-09-25T12:00:00.000Z" },
+    { title: "Accept benchmark observation older", date: "2026-09-24T12:00:00.000Z" },
   ];
   assert.deepEqual(recentRunHighlights(runs, rows, commits), [
     { runId: "newest", acceptedAt: commits[0].date, score: 0.95 },
     { runId: "partial", acceptedAt: commits[1].date, score: null },
     { runId: "multi", acceptedAt: commits[2].date, score: 0.9 },
+    { runId: "older", acceptedAt: commits[3].date, score: null },
   ]);
   assert.throws(() => recentRunHighlights(runs, rows, commits.slice(0, 2)), /acceptance date/);
 });

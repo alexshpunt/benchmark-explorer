@@ -460,6 +460,27 @@ function render() {
   );
 }
 
+/** Show five to eight additions, fitting the desktop intro without padding out the header. */
+function fitRecentRuns() {
+  const items = [...document.querySelector("#recent-runs").children];
+  items.forEach((item) => { item.hidden = false; });
+  let count = Math.min(5, items.length);
+  if (window.matchMedia("(min-width: 901px)").matches && items.length) {
+    const card = document.querySelector(".editorial-data");
+    const budget = document.querySelector(".editorial-intro").getBoundingClientRect().height;
+    const bottomPadding = card.getBoundingClientRect().bottom - items.at(-1).getBoundingClientRect().bottom;
+    for (let index = 5; index < items.length; index++) {
+      if (items[index].getBoundingClientRect().bottom - card.getBoundingClientRect().top + bottomPadding > budget) break;
+      count = index + 1;
+    }
+  }
+  items.forEach((item, index) => { item.hidden = index >= count; });
+}
+const recentRunsObserver = new ResizeObserver(fitRecentRuns);
+recentRunsObserver.observe(document.querySelector(".editorial-intro"));
+window.addEventListener("resize", fitRecentRuns);
+document.fonts.ready.then(fitRecentRuns);
+
 function renderRecentRuns() {
   document.querySelector("#header-run-count").textContent = state.index.runs.length.toLocaleString();
   const list = document.querySelector("#recent-runs");
@@ -511,6 +532,7 @@ function renderRecentRuns() {
     item.append(link);
     return item;
   }));
+  fitRecentRuns();
 }
 let additionsGrid;
 function renderAllAdditions() {
