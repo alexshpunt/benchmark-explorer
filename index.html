@@ -50,11 +50,12 @@
           <p class="editorial-kicker">Explicit Edit / Public benchmark</p>
           <h1 id="explorer-title">What changes when the <em>harness</em> changes?</h1>
           <p class="editorial-description">A public leaderboard comparing how models and harnesses behave on precise text-editing tasks. Explore accepted runs, inspect the evidence, and see where the same model performs differently.</p>
-          <p class="community-invitation">Built from community runs. <a href="https://github.com/alexshpunt/explicit-edit-benchmark" target="_blank" rel="noreferrer">Run the benchmark and contribute your report</a> to help us compare more models and harnesses.</p>
-          <button id="community-people-count" class="community-people-count" type="button">Community contributors</button>
+          <p class="community-invitation">Built from community runs. <button type="button" class="community-text-link" data-community-card="participate">Run the benchmark and contribute your report</button> to help us compare more models and harnesses.</p>
+          <button id="community-people-count" data-community-card="contributors" class="community-people-count" type="button">Community contributors</button>
+          <span class="community-header-links"><button type="button" class="community-text-link" data-community-card="method">How scores work</button><button type="button" class="community-text-link" data-community-card="news">News</button></span>
           <div class="community-estimates" aria-label="Typical full model run">
-            <button type="button" data-community-estimate><span>Full model run cost</span><strong id="community-cost">Loading…</strong></button>
-            <button type="button" data-community-estimate><span>Summed task time</span><strong id="community-time">Loading…</strong></button>
+            <button type="button" data-community-card="cost"><span>Full model run cost</span><strong id="community-cost">Loading…</strong></button>
+            <button type="button" data-community-card="time"><span>Summed task time</span><strong id="community-time">Loading…</strong></button>
           </div>
           <a class="editorial-count" href="#results-view" aria-label="Browse all published runs">
             <span class="editorial-count-dot" aria-hidden="true"></span>
@@ -103,9 +104,9 @@
         </div>
       </section>
 
-      <section class="community-guide" aria-label="Community and benchmark guide">
-        <details id="community-method">
-          <summary>What this benchmark measures and how scores work</summary>
+      <dialog id="community-dialog" class="community-card" aria-labelledby="community-card-title">
+        <div class="community-card-heading"><h2 id="community-card-title">Benchmark guide</h2><button type="button" id="close-community">Close</button></div>
+        <section data-community-panel="method" hidden>
           <div>
             <p>These tasks ask an agent to make precise text changes with its tools. They test whether a model and its harness can find the right text, edit it safely, and produce the exact requested result—not solve a whole software project.</p>
             <p>A run’s published score combines coverage with 75% first-attempt exact success and 25% final exact success after recovery. Exact means the resulting text matches the requested output. Complete runs enter the ratings below; partial results remain available as evidence.</p>
@@ -118,17 +119,14 @@
             </ul>
             <p>Only complete accepted results enter ratings. Missing cells remain missing; baseline substitution happens only in harness totals. Coverage tells you how many baseline routes were actually measured.</p>
           </div>
-        </details>
-        <details id="community-measurements">
-          <summary>What a full model run usually costs*</summary>
+        </section>
+        <section data-community-panel="measurements" hidden>
           <div><p>Header estimates describe one full model × provider × harness × reasoning result, not a multi-model batch. They show the median and P10–P90 of positive, fully measured totals in the published snapshot. Prices depend on the model, provider, and harness.</p><p id="community-samples">Loading measured samples…</p></div>
-        </details>
-        <details>
-          <summary>Community contributors</summary>
+        </section>
+        <section data-community-panel="contributors" hidden>
           <div><p>Ranked by full accepted model results. Each model inside a batch counts separately. Only results attributed to a contributor in the Dataset are listed; this is not a ranking of GitHub code contributions.</p><ol id="community-contributors"><li>Loading contributors…</li></ol></div>
-        </details>
-        <details>
-          <summary>News and what comes next</summary>
+        </section>
+        <section data-community-panel="news" hidden>
           <div>
             <ul class="community-news">
               <li><strong>Now:</strong> model, combination, and baseline-adjusted harness ratings use one shared scoring system. The matrix starts with baseline routes.</li>
@@ -137,8 +135,13 @@
             </ul>
             <p><a href="https://github.com/alexshpunt/explicit-edit-benchmark" target="_blank" rel="noreferrer">See the project and contribution instructions on GitHub</a>. New reports broaden the evidence behind these comparisons.</p>
           </div>
-        </details>
-      </section>
+        </section>
+        <section data-community-panel="participate" hidden>
+          <p>This benchmark grows through community reports. Run a full benchmark for your model and harness, then follow the project instructions to submit your results for checking and publication.</p>
+          <p><a href="https://github.com/alexshpunt/explicit-edit-benchmark" target="_blank" rel="noreferrer">Open the benchmark and contribution instructions on GitHub</a></p>
+          <p>Accepted reports help cover more model-provider routes and make comparisons better supported. Partial reports remain evidence, but do not enter full-run ratings.</p>
+        </section>
+      </dialog>
       <section class="summary-leaderboards" aria-labelledby="summary-leaderboards-title">
         <div class="summary-leaderboards-heading">
           <div>

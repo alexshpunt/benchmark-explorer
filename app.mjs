@@ -1,4 +1,4 @@
-import { renderCommunity } from "./modules/community.mjs";
+import { renderCommunity, installCommunityCards } from "./modules/community.mjs";
 import {
   aggregateLeaderboard,
   filterSnapshotRunRows,
@@ -546,14 +546,7 @@ const SNAPSHOT_CACHE = "benchmark-explorer:snapshots:v1";
 const SNAPSHOT_MANIFEST_KEY = "benchmark-explorer:snapshot-manifest:v1";
 let initialViewRestored = false;
 
-document.querySelectorAll("[data-community-estimate]").forEach((button) => {
-  button.addEventListener("click", () => {
-    const details = document.querySelector("#community-measurements");
-    details.open = true;
-    details.scrollIntoView({ block: "center" });
-    details.querySelector("summary").focus();
-  });
-});
+installCommunityCards();
 
 document.querySelector("#view-all-additions").addEventListener("click", () => {
   renderAllAdditions();

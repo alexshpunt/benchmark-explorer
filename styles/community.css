@@ -1,6 +1,5 @@
 .community-people-count { background: transparent; border: 0; padding: 0; color: var(--text); font: inherit; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 .community-invitation { color: var(--muted); line-height: 1.6; max-width: 65ch; }
-.community-invitation a, .community-guide a { color: var(--accent); }
 .community-estimates { display: flex; flex-wrap: wrap; gap: 12px; margin: 16px 0; }
 .community-estimates button { text-align: left; background: transparent; color: var(--text); border: 0; border-left: 2px solid var(--border-strong); padding: 4px 12px; cursor: pointer; font: inherit; }
 .community-estimates span { display: block; color: var(--muted); font-size: var(--text-small); margin-bottom: 4px; }
@@ -8,12 +7,18 @@
 .community-estimates button:hover { border-color: var(--accent); }
 .community-run-dialog { width: min(640px, 85vw); max-height: 75vh; background: var(--surface); color: var(--text); border: 1px solid var(--border-strong); border-radius: var(--radius-sm); padding: 20px; }
 .community-run-dialog button { display: block; max-width: 100%; overflow-wrap: anywhere; margin: 10px 0; padding: 8px; background: transparent; border: 1px solid var(--border); color: var(--text); font: inherit; cursor: pointer; text-align: left; }
-.community-guide { margin: 16px 0 24px; border-block: 1px solid var(--border); }
-.community-guide details + details { border-top: 1px solid var(--border); }
-.community-guide summary { cursor: pointer; padding: 12px 4px; color: var(--text); font-weight: 600; }
-.community-guide details > div { max-width: 80ch; padding: 0 4px 16px; color: var(--muted); line-height: 1.65; }
-.community-guide li { margin-block: 8px; }
 #community-contributors { padding-left: 24px; }
 #community-contributors li { padding: 6px 0; }
 #community-contributors button { color: var(--text); background: transparent; border: 0; font: inherit; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; margin-left: 16px; }
 @media (max-width: 600px) { #community-contributors button { display: block; margin-left: 0; text-align: left; } }
+
+.community-text-link { background: transparent; color: var(--text); border: 0; padding: 0; font: inherit; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.community-header-links { display: inline-flex; gap: 16px; margin-left: 16px; flex-wrap: wrap; }
+.community-card { width: min(760px, calc(100vw - 48px)); max-height: 80vh; box-sizing: border-box; padding: 24px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); line-height: 1.65; }
+.community-card::backdrop { background: rgba(0, 0, 0, 0.55); }
+.community-card-heading { display: flex; align-items: start; justify-content: space-between; gap: 16px; }
+.community-card-heading h2 { margin: 0; font-size: 20px; }
+.community-card-heading button { color: var(--text); background: transparent; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 6px 12px; font: inherit; cursor: pointer; }
+.community-card section { color: var(--muted); }
+.community-card a { color: var(--accent); }
+@media (max-width: 600px) { .community-card { padding: 16px; } .community-header-links { margin: 10px 0 0; display: flex; } }

@@ -8,6 +8,34 @@ const row = (modelFamily, runId, cost = 1, duration = 600) => ({
   cost: { observations: 10, total: cost }, duration: { observations: 10, total: duration },
 });
 
+test("header card links show one relevant panel without rebuilding contributor evidence", async () => {
+  const { installCommunityCards } = await import("../modules/community.mjs");
+  const handlers = new Map();
+  const keys = ["participate", "contributors", "cost", "time", "method", "news"];
+  const panels = ["participate", "contributors", "measurements", "method", "news"]
+    .map((key) => ({ dataset: { communityPanel: key }, hidden: true }));
+  const title = { textContent: "" };
+  const dialog = { open: false, scrollTop: 99, showModal() { this.open = true; }, close() { this.open = false; } };
+  const previous = globalThis.document;
+  globalThis.document = {
+    querySelector: (selector) => selector === "#community-dialog" ? dialog :
+      selector === "#community-card-title" ? title : { addEventListener: (_event, fn) => handlers.set("close", fn) },
+    querySelectorAll: (selector) => selector === "[data-community-panel]" ? panels :
+      keys.map((key) => ({ dataset: { communityCard: key }, addEventListener: (_event, fn) => handlers.set(key, fn) })),
+  };
+  try {
+    installCommunityCards();
+    for (const key of keys) {
+      handlers.get(key)();
+      assert.equal(dialog.open, true);
+      assert.equal(dialog.scrollTop, 0);
+      const expected = ["cost", "time"].includes(key) ? "measurements" : key;
+      assert.deepEqual(panels.filter((panel) => !panel.hidden).map((panel) => panel.dataset.communityPanel), [expected]);
+      handlers.get("close")();
+      assert.equal(dialog.open, false);
+    }
+  } finally { globalThis.document = previous; }
+});
 test("typical ranges exclude invalid and zero totals and use P10–P90, not extremes", () => {
   assert.deepEqual(typicalRange([0, null, NaN, -1, 1, 2, 3, 4, 100]),
     { median: 3, low: 1.4, high: 61.60000000000001, count: 5 });

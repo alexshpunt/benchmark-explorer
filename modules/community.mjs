@@ -43,6 +43,25 @@ export function communityOverview(snapshot) {
     contributors: [...people.values()].sort((a, b) => b.results - a.results || a.name.localeCompare(b.name)) };
 }
 
+/** Bind header links to one accessible card; shared dialog handling supplies backdrop dismissal. */
+export function installCommunityCards() {
+  const dialog = document.querySelector("#community-dialog");
+  const titles = { participate: "Run the benchmark and contribute", contributors: "Community contributors",
+    cost: "Full model run cost", time: "Summed task time", method: "What we measure and how scores work", news: "News and what comes next" };
+  document.querySelectorAll("[data-community-card]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const key = button.dataset.communityCard;
+      const panel = key === "cost" || key === "time" ? "measurements" : key;
+      document.querySelectorAll("[data-community-panel]").forEach((section) => {
+        section.hidden = section.dataset.communityPanel !== panel;
+      });
+      document.querySelector("#community-card-title").textContent = titles[key];
+      dialog.showModal();
+      dialog.scrollTop = 0;
+    });
+  });
+  document.querySelector("#close-community").addEventListener("click", () => dialog.close());
+}
 /** Render published estimates and attributed contributors without extra network requests. */
 export function renderCommunity(snapshot, openRun) {
   const overview = communityOverview(snapshot);
@@ -57,12 +76,7 @@ export function renderCommunity(snapshot, openRun) {
     `Cost: ${overview.cost?.count ?? 0} results. Time: ${overview.duration?.count ?? 0} results. Time is summed task duration, not elapsed wall time. Zeros and incomplete measurements are excluded. P10–P90 omits the outer 10% at each end; it is not a minimum or maximum.`;
   const list = document.querySelector("#community-contributors");
   document.querySelector("#community-people-count").textContent = `${overview.contributors.length} community contributors`;
-  document.querySelector("#community-people-count").onclick = () => {
-    const details = list.closest("details");
-    details.open = true;
-    details.scrollIntoView({ block: "center" });
-    details.querySelector("summary").focus();
-  };
+
   list.replaceChildren();
   for (const person of overview.contributors) {
     const item = document.createElement("li");
@@ -76,6 +90,7 @@ export function renderCommunity(snapshot, openRun) {
     evidence.textContent = `${person.results} full results · ${person.submissions.size} submissions`;
     evidence.title = "Browse the accepted runs behind this contribution count";
     evidence.addEventListener("click", () => {
+      document.querySelector("#community-dialog").close();
       const dialog = document.createElement("dialog");
       dialog.className = "community-run-dialog";
       const heading = document.createElement("h2");
