@@ -14,6 +14,7 @@
     </script>
     <link rel="stylesheet" href="./styles/base.css" />
     <link rel="stylesheet" href="./styles/header.css" />
+    <link rel="stylesheet" href="./styles/community.css" />
     <link rel="stylesheet" href="./styles/summary-leaderboards.css" />
     <link rel="stylesheet" href="./styles/pareto.css" />
     <link rel="stylesheet" href="./styles/matrix.css" />
@@ -49,6 +50,12 @@
           <p class="editorial-kicker">Explicit Edit / Public benchmark</p>
           <h1 id="explorer-title">What changes when the <em>harness</em> changes?</h1>
           <p class="editorial-description">A public leaderboard comparing how models and harnesses behave on precise text-editing tasks. Explore accepted runs, inspect the evidence, and see where the same model performs differently.</p>
+          <p class="community-invitation">Built from community runs. <a href="https://github.com/alexshpunt/explicit-edit-benchmark" target="_blank" rel="noreferrer">Run the benchmark and contribute your report</a> to help us compare more models and harnesses.</p>
+          <button id="community-people-count" class="community-people-count" type="button">Community contributors</button>
+          <div class="community-estimates" aria-label="Typical full model run">
+            <button type="button" data-community-estimate><span>Full model run cost</span><strong id="community-cost">Loading…</strong></button>
+            <button type="button" data-community-estimate><span>Summed task time</span><strong id="community-time">Loading…</strong></button>
+          </div>
           <a class="editorial-count" href="#results-view" aria-label="Browse all published runs">
             <span class="editorial-count-dot" aria-hidden="true"></span>
             <strong id="header-run-count">—</strong>
@@ -96,6 +103,42 @@
         </div>
       </section>
 
+      <section class="community-guide" aria-label="Community and benchmark guide">
+        <details id="community-method">
+          <summary>What this benchmark measures and how scores work</summary>
+          <div>
+            <p>These tasks ask an agent to make precise text changes with its tools. They test whether a model and its harness can find the right text, edit it safely, and produce the exact requested result—not solve a whole software project.</p>
+            <p>A run’s published score combines coverage with 75% first-attempt exact success and 25% final exact success after recovery. Exact means the resulting text matches the requested output. Complete runs enter the ratings below; partial results remain available as evidence.</p>
+            <p>The reference harness, baseline-agent, is a small Pi-based agent with Bash as its only tool. Harness ratings measure changes against its results on the same model-provider routes.</p>
+            <ul>
+              <li><strong>Model + harness:</strong> median full-run score of the latest complete harness version, selected separately for each model-provider route.</li>
+              <li><strong>Model:</strong> median of its harness-combination scores. Every harness has one vote; extra repeats cannot increase its weight.</li>
+              <li><strong>Harness:</strong> baseline mean plus the sum of measured differences divided by the fixed number of baseline routes. Unmeasured routes contribute zero change. Routes without a full baseline result are excluded; real zero scores are not missing.</li>
+              <li><strong>Matrix:</strong> baseline routes are shown by default. Harnesses with more than three full model-route results get separate columns; rarer Pi extensions share pi-extensions, and other rare harnesses share Others. Expand either group to inspect its members.</li>
+            </ul>
+            <p>Only complete accepted results enter ratings. Missing cells remain missing; baseline substitution happens only in harness totals. Coverage tells you how many baseline routes were actually measured.</p>
+          </div>
+        </details>
+        <details id="community-measurements">
+          <summary>What a full model run usually costs*</summary>
+          <div><p>Header estimates describe one full model × provider × harness × reasoning result, not a multi-model batch. They show the median and P10–P90 of positive, fully measured totals in the published snapshot. Prices depend on the model, provider, and harness.</p><p id="community-samples">Loading measured samples…</p></div>
+        </details>
+        <details>
+          <summary>Community contributors</summary>
+          <div><p>Ranked by full accepted model results. Each model inside a batch counts separately. Only results attributed to a contributor in the Dataset are listed; this is not a ranking of GitHub code contributions.</p><ol id="community-contributors"><li>Loading contributors…</li></ol></div>
+        </details>
+        <details>
+          <summary>News and what comes next</summary>
+          <div>
+            <ul class="community-news">
+              <li><strong>Now:</strong> model, combination, and baseline-adjusted harness ratings use one shared scoring system. The matrix starts with baseline routes.</li>
+              <li><strong>Planned: benchmark v2.</strong> Some configurations now perform very well on the current tasks. We plan a harder second version to make their differences easier to measure.</li>
+              <li><strong>Planned: a hard-task subset.</strong> A smaller set of tasks that many models still fail, for quicker benchmarking. Scope and release dates are not fixed yet.</li>
+            </ul>
+            <p><a href="https://github.com/alexshpunt/explicit-edit-benchmark" target="_blank" rel="noreferrer">See the project and contribution instructions on GitHub</a>. New reports broaden the evidence behind these comparisons.</p>
+          </div>
+        </details>
+      </section>
       <section class="summary-leaderboards" aria-labelledby="summary-leaderboards-title">
         <div class="summary-leaderboards-heading">
           <div>

@@ -1,3 +1,4 @@
+import { renderCommunity } from "./modules/community.mjs";
 import {
   aggregateLeaderboard,
   filterSnapshotRunRows,
@@ -545,6 +546,15 @@ const SNAPSHOT_CACHE = "benchmark-explorer:snapshots:v1";
 const SNAPSHOT_MANIFEST_KEY = "benchmark-explorer:snapshot-manifest:v1";
 let initialViewRestored = false;
 
+document.querySelectorAll("[data-community-estimate]").forEach((button) => {
+  button.addEventListener("click", () => {
+    const details = document.querySelector("#community-measurements");
+    details.open = true;
+    details.scrollIntoView({ block: "center" });
+    details.querySelector("summary").focus();
+  });
+});
+
 document.querySelector("#view-all-additions").addEventListener("click", () => {
   renderAllAdditions();
   document.querySelector("#additions-dialog").showModal();
@@ -584,6 +594,7 @@ function installSnapshot(snapshot, freshness) {
   state.toolCalls = expandToolCounts(snapshot.toolCounts);
   const acceptedRunIds = snapshot.index.runs.map((run) => run.runId);
   state.baselineScores = baselineHarnessScores(snapshot.runRows.all, acceptedRunIds, BASELINE_HARNESS);
+  renderCommunity(snapshot, openRunDetails);
   renderRecentRuns();
   hideLoader();
   render();
