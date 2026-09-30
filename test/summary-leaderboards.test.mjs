@@ -35,11 +35,7 @@ test("summary leaderboards use one median per latest model and harness combinati
     ["alpha", 0.65, 2, 3],
     ["beta", 0.3, 1, 2],
   ]);
-  assert.deepEqual(result.harnesses.map(({ name, score, combinations, runs }) =>
-    [name, Number(score.toFixed(3)), combinations, runs]), [
-    ["h1", 0.55, 2, 4],
-    ["h2", 0.5, 1, 1],
-  ]);
+  assert.deepEqual(result.harnesses, []);
 });
 
 test("a newer harness version is selected separately for each model family", () => {
@@ -51,5 +47,5 @@ test("a newer harness version is selected separately for each model family", () 
     ["alpha", "2.0.0"],
     ["beta", "1.0.0"],
   ]);
-  assert.equal(result.harnesses[0].score, 0.65);
+  assert.deepEqual(result.harnesses, []);
 });

@@ -1,4 +1,5 @@
-import { canonicalModelFamily, compareHarnessVersions, median } from "../core.mjs";
+import { baselineHarnessScores, combinationScore, modelScore, scoredCombinations } from "./scoring.mjs";
+
 import { renderDataTable } from "./leaderboard.mjs";
 import { h } from "../vendor/gridjs-6.2.0.mjs";
 
@@ -15,47 +16,34 @@ const runCount = (rows) => new Set(rows.map((row) => row.runId)).size;
 const ranked = (rows, label) => rows.sort((left, right) =>
   right.score - left.score || label(left).localeCompare(label(right)));
 
-/**
- * Build the three summary rankings from complete accepted runs.
- *
- * Each model-family and harness-family pair first selects the newest harness
- * version available for that model. The pair receives the median run score;
- * model and harness scores are medians of those pair scores, so every pair has
- * one vote regardless of how often it was run.
- */
-export function summaryLeaderboards(rows) {
-  const complete = rows.filter((row) => row.fullBenchmark === true && Number.isFinite(row.score));
-  const pairs = group(complete, (row) =>
-    JSON.stringify([canonicalModelFamily(row.modelFamily), row.harnessFamily]));
-  const combinations = [];
-  for (const pairRows of pairs.values()) {
-    const version = pairRows.map((row) => row.harnessVersion ?? "")
-      .sort(compareHarnessVersions).at(-1);
-    const sourceRows = pairRows.filter((row) => (row.harnessVersion ?? "") === version);
-    const first = sourceRows[0];
-    combinations.push({
-      model: canonicalModelFamily(first.modelFamily),
-      harness: first.harnessFamily,
-      version: version || null,
-      score: median(sourceRows.map((row) => row.score)),
-      runs: runCount(sourceRows),
-      sourceRows,
+/** Build rankings through the shared combination, model, and baseline scoring contract. */
+export function summaryLeaderboards(rows, baselineRows = rows) {
+  const combinations = [...group(scoredCombinations(rows), (item) => JSON.stringify([item.model, item.harness]))]
+    .map(([_key, items]) => {
+      const sourceRows = items.flatMap((item) => item.sourceRows);
+      return { model: items[0].model, harness: items[0].harness,
+        version: [...new Set(items.map((item) => item.version))].join(" / "),
+        score: combinationScore(sourceRows), runs: runCount(sourceRows), sourceRows };
     });
-  }
   ranked(combinations, (row) => `${row.model}\t${row.harness}`);
 
   const summarize = (key, peer) => [...group(combinations, key)].map(([name, items]) => {
     const sourceRows = items.flatMap((item) => item.sourceRows);
     return {
       name,
-      score: median(items.map((item) => item.score)),
+      score: modelScore(items),
       combinations: new Set(items.map(peer)).size,
       runs: runCount(sourceRows),
       sourceRows,
     };
   });
   const models = summarize((item) => item.model, (item) => item.harness);
-  const harnesses = summarize((item) => item.harness, (item) => item.model);
+  const ratings = baselineHarnessScores(baselineRows);
+  const visibleHarnesses = new Set(rows.map((row) => row.harnessFamily));
+  const harnesses = [...ratings.harnesses].filter(([name]) => visibleHarnesses.has(name)).map(([name, rating]) => ({
+    name, score: rating.score, delta: rating.delta, coverage: rating.coverage,
+    combinations: rating.covered, runs: runCount(rating.rows), sourceRows: rating.rows,
+  }));
   ranked(models, (row) => row.name);
   ranked(harnesses, (row) => row.name);
   return { models, harnesses, combinations };
@@ -106,10 +94,10 @@ export function createSummaryLeaderboards(openConfigurationDetails) {
     button.addEventListener("click", () => select(button.dataset.summaryTab));
   });
 
-  return (rows) => {
+  return (rows, baselineRows = rows) => {
     grids.forEach((grid) => grid.destroy());
     grids = [];
-    const rankings = summaryLeaderboards(rows);
+    const rankings = summaryLeaderboards(rows, baselineRows);
     for (const [name, columns] of Object.entries(tables)) {
       const host = document.querySelector(`[data-summary-grid="${name}"]`);
       host.replaceChildren();

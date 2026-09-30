@@ -23,7 +23,7 @@ import { createComparison } from "./modules/comparison.mjs";
 import { createMatrix } from "./modules/matrix.mjs";
 import { createPareto } from "./modules/pareto.mjs";
 import { createSummaryLeaderboards } from "./modules/summary-leaderboards.mjs";
-import { baselineHarnessScores } from "./modules/baseline-score.mjs";
+import { baselineHarnessScores } from "./modules/scoring.mjs";
 
 /** Public home of the accepted data, and the base for every provenance link. */
 const DATASET_PAGE = "https://huggingface.co/datasets/alexshpunt/explicit-edit-benchmark";
@@ -434,7 +434,8 @@ function render() {
     activeFilters(),
   ));
   const runRows = filterSnapshotRunRows(state.snapshot, activeFilters());
-  renderSummaryLeaderboards(runRows);
+  state.scoringRows = runRows;
+  renderSummaryLeaderboards(runRows, state.snapshot.runRows.all);
   const compactRows = latestHarnessConfigurations(
     runRows,
     state.index.runs.map((run) => run.runId),

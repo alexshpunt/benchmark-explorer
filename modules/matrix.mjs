@@ -1,3 +1,4 @@
+import { combinationScore, groupedScore } from "./scoring.mjs";
 import {
   aggregateGroupScore, compareHarnessVersions, matrixHarnessGroup, matrixHarnessRunCounts, median,
   modelRouteIdentity, observedMetricAverage, providerMedian,
@@ -63,7 +64,7 @@ export function matrixAcrossModels(cells, column, rowsOf = (cell) => cell.source
   const fields = ["score", "firstExactRate", "finalExactRate", "recoveryGain", "duration",
     "averageCost", "averageTokens", "qualityPerDollar"];
   const values = Object.fromEntries(fields.map((field) =>
-    [field, median(representatives.map((group) => median(group.map((cell) => cell[field]))))]));
+    [field, field === "score" ? groupedScore(representatives.map((group) => ({ model: group[0].model.split("\t")[0], score: groupedScore(group) }))) : median(representatives.map((group) => median(group.map((cell) => cell[field]))))]));
   return {
     ...column, ...values, key: `across-models:${column.columnKey}`, model: "Overall",
     label: `Across ${families.size} models · ${column.label}`, compact: true,
@@ -131,7 +132,7 @@ export function createMatrix(state, {
 
   function matrixCell(model, harness, version, rows, options = {}) {
     const full = rows.filter((row) => row.fullBenchmark);
-    const score = mean(full.map((row) => row.score).filter((value) => value != null));
+    const score = combinationScore(full);
     return {
       key: options.key ?? cellKey(model, harness, version),
       columnKey: options.columnKey ?? `${harness}@${version ?? "unknown"}`,
@@ -188,12 +189,15 @@ export function createMatrix(state, {
       });
       if (versions.length) {
         const full = versions.filter((row) => row.fullBenchmark);
-        summary.score = median(full.map((row) => row.score));
+        const accepted = (state.scoringRows ?? versions).filter((row) =>
+          modelRouteIdentity(row) === model && row.harnessFamily === harness &&
+          (row.harnessVersion ?? "") === (version ?? ""));
+        summary.score = combinationScore(accepted);
         summary.firstExactRate = aggregateGroupScore(full).firstExactRate;
         summary.finalExactRate = mean(full.map((row) => row.finalExactRate));
         summary.recoveryGain = mean(full.map((row) => row.recoveryGain));
         summary.duration = mean(full.map((row) => row.durationSummary.averageCase));
-        summary.sourceRows = versions;
+        summary.sourceRows = accepted.length ? accepted : versions;
         summary.observations = full.reduce((total, row) => total + row.observations, 0);
         Object.assign(summary, matrixMetricSummary(full, summary.score));
       }
@@ -366,7 +370,7 @@ export function createMatrix(state, {
     const collapse = (members, model, columnKey, harness, groupedHarness = false) => {
       const first = members[0];
       const fields = ["score", "firstExactRate", "finalExactRate", "recoveryGain", "duration", "averageCost", "averageTokens", "qualityPerDollar"];
-      const values = Object.fromEntries(fields.map((field) => [field, providerMedian(members, field)]));
+      const values = Object.fromEntries(fields.map((field) => [field, field === "score" ? groupedScore(members) : providerMedian(members, field)]));
       return { ...first, ...values, key: "group:" + JSON.stringify([model, columnKey]), model,
         columnKey, harness, label: harness,
         compact: first.compact, grouped: true, groupedHarness, sourceRows: [...new Set(members.flatMap(rowsForCell))],
@@ -597,7 +601,7 @@ export function createMatrix(state, {
         const harness = column.groupedHarness && members.length === 1 ? members[0] : column.harness;
         const rating = state.baselineScores?.harnesses.get(harness);
         const rated = rating && (!column.groupedHarness || members.length === 1) &&
-          (column.compact || column.version === rating.version) &&
+          column.compact &&
           (harness === state.baselineScores?.baselineHarness ? column.compact : true);
         summary.unrated = !rated;
         if (rated) {

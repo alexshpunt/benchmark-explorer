@@ -1,3 +1,4 @@
+import { combinationScore, modelRowsScore } from "./scoring.mjs";
 import {
   aggregateGroupScore, canonicalModelFamily, describeDistribution,
   modelRouteIdentity, modelRouteLabel, precomputedFamilyScore, taskFamily, toolTrialCounts,
@@ -459,7 +460,7 @@ export function createDetails(state, {
 
   /** Rows visible under the current filters that belong to one model route. */
   function rowsForModel(route) {
-    return state.configurations.filter((row) => modelRouteIdentity(row) === route);
+    return (state.scoringRows ?? state.configurations).filter((row) => modelRouteIdentity(row) === route);
   }
 
   function rowsForHarness(harness, version) {
@@ -479,10 +480,10 @@ export function createDetails(state, {
   const totalTrials = (rows) =>
     rows.reduce((total, row) => total + row.observations, 0).toLocaleString();
   /** Score, coverage and measured share of one group of configurations. */
-  function groupSummary(rows) {
+  function groupSummary(rows, ratingScore = combinationScore(rows)) {
     const group = aggregateGroupScore(rows);
     return [
-      ["Score", group.score == null ? "—" : (group.score * 100).toFixed(1)],
+      ["Score", ratingScore == null ? "—" : (ratingScore * 100).toFixed(1)],
       ["Coverage", percentText(group.coverage)],
       ["Tasks measured", `${group.taskCount} of ${group.benchmarkTaskCount}`],
     ];
@@ -661,14 +662,14 @@ export function createDetails(state, {
       card: `model:${model}|${provider}`,
       title: `Model route: ${model} · ${provider}`,
       identity: `Provider ${provider}`,
-      note: "Every accepted configuration recorded for this model route under the current filters. The ranking score pools its trials task by task without mixing another provider serving the same model family.",
+      note: "Every accepted configuration recorded for this model route under the current filters. The model score is the median of latest model-harness combination scores, with one vote per harness.",
       summary: [
         ["Model family", model],
         ["Provider", provider],
         ["Configurations", String(rows.length)],
         ["Harnesses", String(new Set(rows.map((row) => row.harnessFamily)).size)],
         ["Trials", totalTrials(rows)],
-        ...groupSummary(rows),
+        ...groupSummary(rows, modelRowsScore(rows)),
       ],
       rows,
       links: { "Official model page": state.views?.sources?.models?.[model]?.officialPageUrl },
@@ -736,6 +737,8 @@ export function createDetails(state, {
         : source?.packageUrl;
     const family = state.views?.badges?.harnessFamily?.[harness];
     const summary = groupSummary(rows);
+    const rating = state.baselineScores?.harnesses.get(harness);
+    summary.push(["Harness rating vs baseline-agent", rating ? (rating.score * 100).toFixed(1) : "—"]);
     const badgeVersion = family?.harnessVersion
       ? compactVersion(family.harnessVersion)
       : "no complete version";

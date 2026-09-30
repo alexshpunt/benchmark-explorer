@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { baselineHarnessScores } from "../modules/baseline-score.mjs";
+import { baselineHarnessScores } from "../modules/scoring.mjs";
 
 const full = (model, provider, harness, version, runId, score) => ({
   modelFamily: model, provider, harnessFamily: harness, harnessVersion: version,
@@ -54,7 +54,7 @@ test("specification example keeps a fixed M, imputes missing only in totals, and
 test("baseline repeats share one route vote and use the latest run's version", () => {
   const rows = [
     full("a", "p", "baseline-agent", "1", "b1", 0.6),
-    full("a", "p", "baseline-agent", "old", "old", 0.1),
+    full("a", "p", "baseline-agent", "0", "old", 0.1),
     full("a", "p", "baseline-agent", "1", "b2", 1),
     full("b", "p", "baseline-agent", "1", "b3", 0.4),
   ];
@@ -94,7 +94,7 @@ test("missing routes inherit their own baseline and every provider route gets on
   assert.equal(scores.harnesses.get("baseline-agent").delta, 0);
 });
 
-test("the latest complete harness version applies globally; baseline stays latest per route", () => {
+test("the latest complete version is selected independently per route", () => {
   const rows = [
     full("a", "p", "baseline-agent", "1", "b1", 0.5),
     full("b", "p", "baseline-agent", "2", "b2", 0.6),
@@ -107,9 +107,9 @@ test("the latest complete harness version applies globally; baseline stays lates
   const scores = baselineHarnessScores(rows, rows.map((row) => row.runId));
   const other = scores.harnesses.get("other");
   assert.equal(scores.models, 2);
-  assert.equal(other.version, "2");
-  assert.equal(other.covered, 1);
-  assert.ok(Math.abs(other.score - 0.7) < 1e-10);
+  assert.equal(other.version, null);
+  assert.equal(other.covered, 2);
+  assert.ok(Math.abs(other.score - 0.85) < 1e-10);
   assert.equal(scores.baselines.get("a\tp").version, "3");
   assert.equal(scores.baselines.get("b\tp").version, "2");
 });

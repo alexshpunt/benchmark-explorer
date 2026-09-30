@@ -1,3 +1,4 @@
+import { combinationScore } from "./scoring.mjs";
 import { compareHarnessVersions, median } from "../core.mjs";
 
 const modelOf = (cell) => cell.model.split("\t")[0];
@@ -30,12 +31,12 @@ export function paretoPoints(cells, axis = "cost") {
           byRun.set(id, [...(byRun.get(id) ?? []), row]);
         }
         const runGroups = [...byRun.values()];
-        const scores = runGroups.map((group) => median(group.map((row) => row.score)));
+        const scores = runGroups.map(combinationScore);
         const value = selected.every((row) => measured(row, metric))
           ? median(runGroups.map((group) => median(group.map((row) => row[metric].total))))
           : null;
         if (value == null) { missingAxis++; return []; }
-        const score = median(scores);
+        const score = combinationScore(selected);
         const key = `pareto:route:${JSON.stringify([original.model, original.harness, version, reasoning])}`;
         const cell = { ...original, key, score, version, reasoning,
           label: `${original.harness}@${version} · ${reasoning}`,
