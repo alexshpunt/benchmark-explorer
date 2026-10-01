@@ -44,11 +44,19 @@ test("horizontal scroll stays available in the middle of the matrix and follows 
   await page.screenshot({ path: testInfo.outputPath("matrix-scrollbar-middle.png") });
   await page.setViewportSize({ width: page.viewportSize().width - 40, height: 480 });
   await expect(bar).toBeVisible();
-  await expect.poll(async () => (await bar.boundingBox()).width).toBe(await matrix.evaluate((root) => root.clientWidth));
+  await expect.poll(async () => (await bar.boundingBox()).width).toBe(await matrix.evaluate((root) => root.getBoundingClientRect().width));
   await expect.poll(() => slider.getAttribute("max")).toBe(String(await matrix.evaluate((root) => root.scrollWidth - root.clientWidth)));
 
   await matrix.evaluate((root) => window.scrollTo(0, scrollY + root.getBoundingClientRect().bottom - innerHeight / 2));
-  await expect.poll(async () => Math.round((await bar.boundingBox()).y + (await bar.boundingBox()).height)).toBe(239);
+  await expect(bar).not.toHaveClass(/is-pinned/);
+  await expect.poll(async () => Math.round((await bar.boundingBox()).y + (await bar.boundingBox()).height)).toBe(264);
+  const normalStyle = await bar.getAttribute("style");
+  const normalBox = await bar.boundingBox();
+  await page.evaluate(() => window.scrollBy(0, 60));
+  await expect.poll(async () => Math.round((await bar.boundingBox()).y)).toBe(Math.round(normalBox.y - 60));
+  await expect(bar).toHaveAttribute("style", normalStyle);
+  await page.screenshot({ path: testInfo.outputPath("matrix-scrollbar-normal.png") });
+  await expect(bar).not.toHaveClass(/is-pinned/);
   await page.locator(".pareto-panel").scrollIntoViewIfNeeded();
   await expect(bar).toBeHidden();
   await matrix.evaluate((root) => window.scrollTo(0, scrollY + root.getBoundingClientRect().top - 100));

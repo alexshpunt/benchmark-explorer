@@ -326,15 +326,22 @@
 
 /* Keep horizontal scrolling available while the middle of a long matrix is visible. */
 .matrix-shell.has-horizontal-overflow {
-  padding-bottom: 24px;
   scrollbar-width: none;
 }
 .matrix-shell.has-horizontal-overflow::-webkit-scrollbar {
   display: none;
 }
-.matrix-scrollbar {
+.matrix-scrollbar-slot {
+  height: 24px;
+}
+.matrix-scrollbar.is-pinned {
   position: fixed;
   z-index: 30;
+  left: var(--scroll-left);
+  width: var(--scroll-width);
+  bottom: 8px;
+}
+.matrix-scrollbar {
   height: 24px;
   box-sizing: border-box;
   padding: 4px 8px;
