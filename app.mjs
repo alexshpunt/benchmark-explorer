@@ -5,6 +5,7 @@ import {
   canonicalModelFamily,
   modelRouteIdentity,
   modelRouteLabel,
+  modelReasoning,
   normalizeColumnLayout,
   latestHarnessConfigurations,
   expandToolCounts,
@@ -219,7 +220,7 @@ function configToken(row) {
     row.provider ?? "unknown",
     row.harnessFamily,
     row.harnessVersion ?? "",
-    row.thinking ?? "",
+    modelReasoning(row),
     row.runId ?? "",
   ].join("|");
 }
@@ -231,19 +232,18 @@ function scopeOf(token) {
   const rows = runId ? (state.snapshot?.runRows?.all ?? []) : state.configurations;
   return rows.filter(
     (row) =>
-      canonicalModelFamily(row.modelFamily) === model &&
-      (row.provider ?? "unknown") === provider &&
+      (model === "*" || canonicalModelFamily(row.modelFamily) === model) &&
+      (provider === "*" || (row.provider ?? "unknown") === provider) &&
       (harness === "*" || row.harnessFamily === harness) &&
       (version === "" || (row.harnessVersion ?? "") === version) &&
-      (thinking === "" || (row.thinking ?? "") === thinking) &&
+      (thinking === "" || modelReasoning(row) === thinking) &&
       (runId === "" || row.runId === runId),
   );
 }
 
 /**
  * Scope token for a card opened from a set of rows. One row keeps its exact
- * identity; a whole matrix cell drops the reasoning mode, which is the axis
- * that was rolled up.
+ * identity; a multi-row scope keeps its reasoning when all evidence agrees.
  */
 function scopeToken(rows) {
   const [first] = rows;
@@ -254,11 +254,11 @@ function scopeToken(rows) {
     new Set(rows.map((row) => row.harnessFamily)).size > 1 ? "*" : first.harnessFamily;
   const runIds = new Set(rows.map((row) => row.runId).filter(Boolean));
   return [
-    canonicalModelFamily(first.modelFamily),
-    first.provider ?? "unknown",
+    new Set(rows.map((row) => canonicalModelFamily(row.modelFamily))).size === 1 ? canonicalModelFamily(first.modelFamily) : "*",
+    new Set(rows.map((row) => row.provider ?? "unknown")).size === 1 ? first.provider ?? "unknown" : "*",
     harness,
-    first.harnessVersion ?? "",
-    "",
+    new Set(rows.map((row) => row.harnessVersion ?? "")).size === 1 ? first.harnessVersion ?? "" : "",
+    new Set(rows.map(modelReasoning)).size === 1 ? modelReasoning(first) : "",
     runIds.size === 1 ? [...runIds][0] : "",
   ].join("|");
 }
@@ -294,7 +294,7 @@ function openCard(value) {
   const boundary = payload.indexOf("|");
   const name = boundary < 0 ? payload : payload.slice(0, boundary);
   const scope = boundary < 0 ? "all" : payload.slice(boundary + 1);
-  if (kind === "model") openModelDetails(`${name}\t${scope}`);
+  if (kind === "model") openModelDetails(payload);
   else if (kind === "harness") {
     const [family, version = ""] = name.split("@");
     const badgeVersion = state.views?.badges?.harnessFamily?.[family]?.harnessVersion;

@@ -26,14 +26,14 @@ test("summary leaderboards use one median per latest model and harness combinati
   const result = summaryLeaderboards(rows);
   assert.deepEqual(result.combinations.map(({ model, harness, version, score, runs }) =>
     [model, harness, version, Number(score.toFixed(3)), runs]), [
-    ["alpha", "h1", "2.0.0", 0.8, 2],
-    ["alpha", "h2", "1.0.0", 0.5, 1],
-    ["beta", "h1", "1.0.0", 0.3, 2],
+    ["alpha · unspecified", "h1", "2.0.0", 0.8, 2],
+    ["alpha · unspecified", "h2", "1.0.0", 0.5, 1],
+    ["beta · unspecified", "h1", "1.0.0", 0.3, 2],
   ]);
   assert.deepEqual(result.models.map(({ name, score, combinations, runs }) =>
     [name, Number(score.toFixed(3)), combinations, runs]), [
-    ["alpha", 0.65, 2, 3],
-    ["beta", 0.3, 1, 2],
+    ["alpha · unspecified", 0.65, 2, 3],
+    ["beta · unspecified", 0.3, 1, 2],
   ]);
   assert.deepEqual(result.harnesses, []);
 });
@@ -44,8 +44,8 @@ test("a newer harness version is selected separately for each model family", () 
     row("beta", "p", "h", "1.0.0", 0.4, "b"),
   ]);
   assert.deepEqual(result.combinations.map(({ model, version }) => [model, version]), [
-    ["alpha", "2.0.0"],
-    ["beta", "1.0.0"],
+    ["alpha · unspecified", "2.0.0"],
+    ["beta · unspecified", "1.0.0"],
   ]);
   assert.deepEqual(result.harnesses, []);
 });

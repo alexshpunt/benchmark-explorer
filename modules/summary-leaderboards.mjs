@@ -18,7 +18,7 @@ const ranked = (rows, label) => rows.sort((left, right) =>
 
 /** Build rankings through the shared combination, model, and baseline scoring contract. */
 export function summaryLeaderboards(rows, baselineRows = rows) {
-  const combinations = [...group(scoredCombinations(rows), (item) => JSON.stringify([item.model, item.harness]))]
+  const combinations = [...group(scoredCombinations(rows), (item) => JSON.stringify([item.modelKey, item.harness]))]
     .map(([_key, items]) => {
       const sourceRows = items.flatMap((item) => item.sourceRows);
       return { model: items[0].model, harness: items[0].harness,
@@ -66,7 +66,7 @@ export function createSummaryLeaderboards(openConfigurationDetails) {
       { id: "#", name: "#", sort: false, cell: (_row, index) => index + 1 },
       { id: "harness", name: "Harness", cell: (row) => row.name },
       { id: "score", name: "Score", cell: (row) => score(row.score) },
-      { id: "combinations", name: "Models", cell: (row) => row.combinations },
+      { id: "combinations", name: "Routes", cell: (row) => row.combinations },
       { id: "runs", name: "Runs", cell: (row) => row.runs },
     ],
     combinations: [

@@ -1,5 +1,5 @@
 import { combinationScore } from "./scoring.mjs";
-import { compareHarnessVersions, median } from "../core.mjs";
+import { compareHarnessVersions, median, modelReasoning } from "../core.mjs";
 
 const modelOf = (cell) => cell.model.split("\t")[0];
 const measured = (row, metric) => row[metric]?.observations === row.observations &&
@@ -20,7 +20,7 @@ export function paretoPoints(cells, axis = "cost") {
         .sort(compareHarnessVersions).at(-1);
       const variants = new Map();
       for (const row of full.filter((entry) => (entry.harnessVersion ?? "") === version)) {
-        const reasoning = row.thinking ?? "unspecified";
+        const reasoning = modelReasoning(row);
         variants.set(reasoning, [...(variants.get(reasoning) ?? []), row]);
       }
       return [...variants].flatMap(([reasoning, selected]) => {

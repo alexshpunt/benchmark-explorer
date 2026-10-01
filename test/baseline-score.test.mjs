@@ -60,7 +60,7 @@ test("baseline repeats share one route vote and use the latest run's version", (
   ];
   const scores = baselineHarnessScores(rows, rows.map((row) => row.runId));
   assert.equal(scores.models, 2);
-  assert.equal(scores.baselines.get("a\tp").score, 0.8);
+  assert.equal(scores.baselines.get("a\tp\tunspecified").score, 0.8);
   assert.ok(Math.abs(scores.baselineMean - 0.6) < 1e-10);
 });
 test("the default baseline is baseline-agent, not pi-default", () => {
@@ -90,7 +90,7 @@ test("missing routes inherit their own baseline and every provider route gets on
   assert.ok(Math.abs(scores.baselineMean - 2 / 3) < 1e-10);
   assert.ok(Math.abs(scores.harnesses.get("other").score - 0.65) < 1e-10);
   assert.equal(scores.harnesses.get("other").covered, 2);
-  assert.deepEqual(scores.harnesses.get("other").models, ["luna\ta", "glm\tc"]);
+  assert.deepEqual(scores.harnesses.get("other").models, ["luna\ta\tunspecified", "glm\tc\tunspecified"]);
   assert.equal(scores.harnesses.get("baseline-agent").delta, 0);
 });
 
@@ -110,8 +110,8 @@ test("the latest complete version is selected independently per route", () => {
   assert.equal(other.version, null);
   assert.equal(other.covered, 2);
   assert.ok(Math.abs(other.score - 0.85) < 1e-10);
-  assert.equal(scores.baselines.get("a\tp").version, "3");
-  assert.equal(scores.baselines.get("b\tp").version, "2");
+  assert.equal(scores.baselines.get("a\tp\tunspecified").version, "3");
+  assert.equal(scores.baselines.get("b\tp\tunspecified").version, "2");
 });
 
 test("another harness can supply the per-route baseline without changing the formula", () => {

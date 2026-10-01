@@ -646,8 +646,8 @@ export function createMatrix(state, {
       const heading = document.createElement("th");
       heading.className = "matrix-model-column";
       heading.scope = "row";
-      const [modelFamily, provider] = model.split("\t");
-      const modelLabel = provider ? `${modelFamily} · ${provider}` : modelFamily;
+      const [modelFamily, provider, reasoning] = model.split("\t");
+      const modelLabel = provider ? `${modelFamily} · ${provider} · ${reasoning ?? "unspecified"}` : modelFamily;
       heading.classList.toggle("matrix-expanded-model",
         state.matrixGroups.has("model") && models.includes(modelFamily) && state.expandedModels.has(modelFamily));
       heading.title = `Open ${modelLabel}`;
@@ -671,7 +671,7 @@ export function createMatrix(state, {
         chevron.textContent = "›";
         toggle.append(chevron);
         toggle.setAttribute("aria-expanded", String(expanded));
-        toggle.setAttribute("aria-label", (expanded ? "Collapse " : "Expand ") + modelFamily + " providers");
+        toggle.setAttribute("aria-label", (expanded ? "Collapse " : "Expand ") + modelFamily + " provider × reasoning variants");
         toggle.addEventListener("click", () => {
           if (expanded) state.expandedModels.delete(modelFamily);
           else state.expandedModels.add(modelFamily);

@@ -4,3 +4,4 @@ dist/
 .space/
 .tmp/
 .playwright-mcp/
+node_modules/

@@ -103,15 +103,18 @@ export function resolveHarnessVersion(configurations, harness, requestedVersion)
 }
 
 /**
- * Pick the compact harness rows for each model route and family: highest
- * available version first, then the last accepted run in the pinned Dataset
- * index. All exact configurations from that selected run remain available.
+ * Pick each exact route’s newest complete harness version, then its last accepted run.
+ * Partial-only routes retain their newest evidence. Run order comes from the pinned
+ * Dataset index; exact configurations from the selected run remain available.
  */
 export function latestHarnessConfigurations(rows, acceptedRunIds) {
   const runOrder = new Map(acceptedRunIds.map((runId, index) => [runId, index]));
   const latest = new Map();
+  const pairKey = (row) => JSON.stringify([modelRouteIdentity(row), row.harnessFamily]);
+  const completePairs = new Set(rows.filter((row) => row.fullBenchmark && Number.isFinite(row.score)).map(pairKey));
   for (const row of rows) {
-    const key = JSON.stringify([modelRouteIdentity(row), row.harnessFamily]);
+    const key = pairKey(row);
+    if (completePairs.has(key) && (!row.fullBenchmark || !Number.isFinite(row.score))) continue;
     const current = latest.get(key);
     const versionOrder = current
       ? compareHarnessVersions(row.harnessVersion ?? "", current.version ?? "")
@@ -123,7 +126,9 @@ export function latestHarnessConfigurations(rows, acceptedRunIds) {
     }
   }
   return rows.filter((row) => {
-    const selected = latest.get(JSON.stringify([modelRouteIdentity(row), row.harnessFamily]));
+    const key = pairKey(row);
+    if (completePairs.has(key) && (!row.fullBenchmark || !Number.isFinite(row.score))) return false;
+    const selected = latest.get(key);
     return selected?.version === row.harnessVersion && selected.runId === row.runId;
   });
 }
@@ -206,14 +211,29 @@ export function canonicalModelFamily(value) {
   return String(value).split("/").at(-1);
 }
 
-/** Return the primary model route identity: model family plus provider. */
-export function modelRouteIdentity(row) {
-  return `${canonicalModelFamily(row.modelFamily)}\t${row.provider ?? "unknown"}`;
+/** Keep missing reasoning explicit; it is not the same configuration as off. */
+export function modelReasoning(row) {
+  return row.thinking == null || row.thinking === "" ? "unspecified" : String(row.thinking);
 }
 
-/** Return the model route label shown in rankings and drill-downs. */
+/** Rated model identity: model family and its recorded reasoning mode, without provider. */
+export function modelIdentity(row) {
+  return `${canonicalModelFamily(row.modelFamily)}\t${modelReasoning(row)}`;
+}
+
+/** Human label for a rated model variant. */
+export function modelLabel(row) {
+  return `${canonicalModelFamily(row.modelFamily)} · ${modelReasoning(row)}`;
+}
+
+/** Exact comparison route: model family, provider, and recorded reasoning mode. */
+export function modelRouteIdentity(row) {
+  return `${canonicalModelFamily(row.modelFamily)}\t${row.provider ?? "unknown"}\t${modelReasoning(row)}`;
+}
+
+/** Model route label shown in the matrix and drill-downs. */
 export function modelRouteLabel(row) {
-  return `${canonicalModelFamily(row.modelFamily)} · ${row.provider ?? "unknown"}`;
+  return `${canonicalModelFamily(row.modelFamily)} · ${row.provider ?? "unknown"} · ${modelReasoning(row)}`;
 }
 
 /** Position a floating filter menu inside the viewport next to its trigger. */
@@ -392,7 +412,7 @@ function trialMatchesFilters(identity, family, filters) {
       `${identity.harnessFamily}\t${identity.harnessVersion}`,
       filters.harnessVersion,
     ) &&
-    matchesFilter(identity.thinking, filters.reasoning) &&
+    matchesFilter(modelReasoning(identity), filters.reasoning) &&
     matchesFilter(family, filters.taskFamily)
   );
 }
@@ -847,7 +867,7 @@ export function precomputedFamilyScore(row, family) {
     ) ??
     candidates.find(
       (candidate) =>
-        canonicalModelFamily(candidate.modelFamily) === canonicalModelFamily(row.modelFamily) &&
+        modelRouteIdentity(candidate) === modelRouteIdentity(row) &&
         candidate.harnessFamily === row.harnessFamily &&
         candidate.harnessVersion === row.harnessVersion,
     ) ??
@@ -919,7 +939,7 @@ export function aggregateLeaderboard(_index, _profiles, _trials, _rounds, filter
       filters.model.some(
         (model) => canonicalModelFamily(model) === canonicalModelFamily(row.modelFamily),
       )) &&
-    selected(row.thinking, filters.reasoning) &&
+    selected(modelReasoning(row), filters.reasoning) &&
     selected(row.agentFamily, filters.agent) &&
     selected(`${row.agentFamily}\t${row.agentVersion}`, filters.agentVersion) &&
     selected(row.harnessFamily, filters.harness) &&
@@ -977,7 +997,7 @@ export function filterOptions(index, profiles, trials) {
     choices.harnesses.add(identity.harnessFamily);
     if (identity.harnessVersion)
       choices.harnessVersions.add(`${identity.harnessFamily}\t${identity.harnessVersion}`);
-    if (identity.thinking) choices.reasoning.add(identity.thinking);
+    choices.reasoning.add(modelReasoning(identity));
   }
   for (const trial of trials) choices.taskFamilies.add(taskFamily(trial.taskId));
   return Object.fromEntries(

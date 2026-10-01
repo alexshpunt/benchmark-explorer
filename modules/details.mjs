@@ -1,7 +1,7 @@
 import { combinationScore, modelRowsScore } from "./scoring.mjs";
 import {
   aggregateGroupScore, canonicalModelFamily, describeDistribution,
-  modelRouteIdentity, modelRouteLabel, precomputedFamilyScore, taskFamily, toolTrialCounts,
+  modelRouteIdentity, modelRouteLabel, modelReasoning, precomputedFamilyScore, taskFamily, toolTrialCounts,
 } from "../core.mjs";
 import { compactVersion } from "./comparison.mjs";
 
@@ -296,7 +296,7 @@ export function createDetails(state, {
 
   /** One line that names a configuration in lists and dialogs. */
   function configurationLabel(row) {
-    return `${modelRouteLabel(row)} · ${row.harnessFamily} ${compactVersion(row.harnessVersion)} · ${row.thinking ?? "unknown"}`;
+    return `${modelRouteLabel(row)} · ${row.harnessFamily} ${compactVersion(row.harnessVersion)}`;
   }
 
   /**
@@ -474,7 +474,7 @@ export function createDetails(state, {
   }
 
   function rowsForThinking(thinking) {
-    return state.configurations.filter((row) => row.thinking === thinking);
+    return state.configurations.filter((row) => modelReasoning(row) === thinking);
   }
 
   const totalTrials = (rows) =>
@@ -572,6 +572,8 @@ export function createDetails(state, {
             ["model", canonicalModelFamily(first.modelFamily)],
             ["provider", first.provider ?? "unknown"],
             ["harness", first.harnessFamily],
+            ...(rows.every((row) => modelReasoning(row) === modelReasoning(first))
+              ? [["reasoning", modelReasoning(first)]] : []),
             ...(first.harnessVersion
               ? [["harnessVersion", `${first.harnessFamily}\t${first.harnessVersion}`]]
               : []),
@@ -656,16 +658,17 @@ export function createDetails(state, {
   function openModelDetails(route) {
     const rows = rowsForModel(route);
     if (!rows.length) return;
-    const [model, provider] = route.split("\t");
+    const [model, provider, reasoning] = route.split("\t");
     openGroupDetails({
       kind: "model route",
-      card: `model:${model}|${provider}`,
-      title: `Model route: ${model} · ${provider}`,
-      identity: `Provider ${provider}`,
+      card: `model:${route}`,
+      title: `Model route: ${model} · ${provider} · ${reasoning}`,
+      identity: `Provider ${provider} · reasoning ${reasoning}`,
       note: "Every accepted configuration recorded for this model route under the current filters. The model score is the median of latest model-harness combination scores, with one vote per harness.",
       summary: [
         ["Model family", model],
         ["Provider", provider],
+        ["Reasoning", reasoning],
         ["Configurations", String(rows.length)],
         ["Harnesses", String(new Set(rows.map((row) => row.harnessFamily)).size)],
         ["Trials", totalTrials(rows)],
@@ -676,6 +679,7 @@ export function createDetails(state, {
       filters: [
         ["model", model],
         ["provider", provider],
+        ["reasoning", reasoning],
       ],
     });
   }

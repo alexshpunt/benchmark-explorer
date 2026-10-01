@@ -1,6 +1,6 @@
-import { canonicalModelFamily, compareHarnessVersions, median, modelRouteIdentity } from "../core.mjs";
+import { modelIdentity, modelLabel, compareHarnessVersions, median, modelRouteIdentity } from "../core.mjs";
 
-/** Median full-run score, with one vote per run and model-provider route. */
+/** Median full-run score, with one vote per run and model-provider-reasoning route. */
 export function combinationScore(rows) {
   const runs = new Map();
   for (const row of rows) {
@@ -11,7 +11,7 @@ export function combinationScore(rows) {
   return median([...runs.values()].map(median));
 }
 
-/** Display-only grouped score: one median per provider route, then one group median. */
+/** Display-only grouped score: one median per provider-reasoning route, then one group median. */
 export function groupedScore(cells) {
   const routes = new Map();
   for (const cell of cells) routes.set(cell.model, [...(routes.get(cell.model) ?? []), cell.score]);
@@ -22,7 +22,7 @@ export function modelScore(combinations) {
   return median(combinations.map((item) => item.score));
 }
 
-/** Latest complete harness version separately for each model-provider route. */
+/** Latest complete harness version separately for each model-provider-reasoning route. */
 export function scoredCombinations(rows) {
   const pairs = new Map();
   for (const row of rows) {
@@ -34,7 +34,7 @@ export function scoredCombinations(rows) {
     const version = members.map((row) => row.harnessVersion ?? "").sort(compareHarnessVersions).at(-1);
     const sourceRows = members.filter((row) => (row.harnessVersion ?? "") === version);
     return { harness: members[0].harnessFamily, route: modelRouteIdentity(members[0]),
-      model: canonicalModelFamily(members[0].modelFamily), version,
+      model: modelLabel(members[0]), modelKey: modelIdentity(members[0]), version,
       score: combinationScore(sourceRows), sourceRows };
   });
 }

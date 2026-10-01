@@ -1,4 +1,4 @@
-import { canonicalModelFamily, popoverPosition, taskFamily } from "../core.mjs";
+import { canonicalModelFamily, modelReasoning, popoverPosition, taskFamily } from "../core.mjs";
 
 /** Create filter menus, ranges and leaderboard header controls. */
 export function createFilters(state, {
@@ -130,17 +130,11 @@ export function createFilters(state, {
         key: "reasoning",
         label: "Thinking",
         options: uniqueOptions(
-          profiles.flatMap((profile) =>
-            profile.thinking
-              ? [
-                  {
-                    value: profile.thinking,
-                    label: profile.thinking,
-                    configuration: profile.configurationHash,
-                  },
-                ]
-              : [],
-          ),
+          profiles.map((profile) => ({
+            value: modelReasoning(profile),
+            label: modelReasoning(profile),
+            configuration: profile.configurationHash,
+          })),
         ),
       },
       {
