@@ -1,3 +1,4 @@
+import { installMatrixScrollbar } from "./matrix-scrollbar.mjs";
 import { combinationScore, groupedScore } from "./scoring.mjs";
 import {
   aggregateGroupScore, compareHarnessVersions, matrixHarnessGroup, matrixHarnessRunCounts, median,
@@ -108,6 +109,7 @@ export function createMatrix(state, {
 }) {
   let groupingSnapshot;
   let harnessRunCounts;
+  let refreshScrollbar;
   function harnessGroup(harness) {
     if (groupingSnapshot !== state.snapshot || !harnessRunCounts) {
       groupingSnapshot = state.snapshot;
@@ -692,6 +694,8 @@ export function createMatrix(state, {
     }
     table.append(head, body);
     root.append(table);
+    refreshScrollbar ??= installMatrixScrollbar(root);
+    refreshScrollbar();
     const updateScrollEdges = () => {
       root.classList.toggle("can-scroll-left", root.scrollLeft > 1);
       root.classList.toggle(
