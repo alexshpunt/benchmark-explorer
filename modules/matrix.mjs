@@ -484,8 +484,8 @@ export function createMatrix(state, {
       const inExpandedGroup = byHarness.has(group) && (group === "Others" || group === "pi-extensions") &&
         state.expandedMatrixGroups.has(group) && state.matrixGroups.has(
           group === "Others" ? "harness" : "extension");
-      th.classList.toggle("matrix-expanded-head", expanded || inExpandedGroup ||
-        (seriesCell.grouped && state.expandedMatrixGroups.has(seriesCell.harness)));
+      th.classList.toggle("matrix-expanded-head", Boolean(expanded || inExpandedGroup ||
+        (seriesCell.grouped && state.expandedMatrixGroups.has(seriesCell.harness))));
       th.title = ["Others", "pi-extensions"].includes(seriesCell.harness)
         ? `${seriesCell.harness}\nMedian across the group's harnesses per provider route`
         : seriesCell.compact

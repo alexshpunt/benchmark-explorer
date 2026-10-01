@@ -95,6 +95,7 @@ test("reasoning filter leaves a direct row and fixed harness rating; evidence UR
   await expect(routeRow(page, "m · p · low")).toHaveCount(1);
   await expect(page.locator(".matrix-model-toggle")).toHaveCount(0);
   await expect(page.locator('.matrix-table thead .matrix-expand-toggle[data-harness="baseline-agent"]')).toHaveCount(0);
+  await expect(page.locator('.matrix-table thead .matrix-expanded-head')).toHaveCount(0);
   await page.locator('[data-summary-tab="models"]').click();
   await expect(grid(page, "models").locator("tbody tr")).toHaveCount(1);
   await expect(rankedRow(page, "models", "m · low")).toContainText("55");
