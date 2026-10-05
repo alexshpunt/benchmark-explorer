@@ -2,7 +2,7 @@ import { installMatrixScrollbar } from "./matrix-scrollbar.mjs";
 import { combinationScore, groupedScore } from "./scoring.mjs";
 import {
   aggregateGroupScore, compareHarnessVersions, matrixHarnessGroup, matrixHarnessRunCounts, median,
-  modelRouteIdentity, observedMetricAverage, providerMedian,
+  modelRouteIdentity, modelRouteLabelFromIdentity, observedMetricAverage, providerMedian,
   qualityPerDollar, relativeQualityPosition,
 } from "../core.mjs";
 
@@ -648,8 +648,8 @@ export function createMatrix(state, {
       const heading = document.createElement("th");
       heading.className = "matrix-model-column";
       heading.scope = "row";
-      const [modelFamily, provider, reasoning] = model.split("\t");
-      const modelLabel = provider ? `${modelFamily} · ${provider} · ${reasoning ?? "unspecified"}` : modelFamily;
+      const [modelFamily, provider] = model.split("\t");
+      const modelLabel = modelRouteLabelFromIdentity(model);
       heading.classList.toggle("matrix-expanded-model",
         state.matrixGroups.has("model") && models.includes(modelFamily) && state.expandedModels.has(modelFamily));
       heading.title = `Open ${modelLabel}`;

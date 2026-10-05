@@ -1,4 +1,5 @@
 import { paretoFrontier, paretoPoints, paretoReasoningLinks } from "./pareto-data.mjs";
+import { modelRouteLabel } from "../core.mjs";
 
 const NS = "http://www.w3.org/2000/svg";
 const money = (value) => `$${value.toFixed(value < 0.1 ? 3 : value < 1 ? 2 : 1)}`;
@@ -9,7 +10,8 @@ const svg = (name, attrs = {}) => {
   for (const [key, value] of Object.entries(attrs)) element.setAttribute(key, String(value));
   return element;
 };
-const pointName = (point) => `${point.model} · ${point.provider} / ${point.harness} · ${point.reasoning}`;
+const pointModelLabel = (point) => modelRouteLabel({ modelFamily: point.model, provider: point.provider, thinking: point.reasoning });
+const pointName = (point) => `${pointModelLabel(point)} · ${point.harness}`;
 
 /** Draw a keyboard-accessible score frontier over measured cost or tokens. */
 export function createPareto(state, selectCell, refresh, syncUrl) {
@@ -211,9 +213,9 @@ export function createPareto(state, selectCell, refresh, syncUrl) {
       button.setAttribute("aria-pressed", String(state.selected.has(point.key)));
       button.title = `Compare ${pointName(point)}`;
       const name = document.createElement("strong");
-      name.textContent = `${point.model} · ${point.provider}`;
+      name.textContent = pointModelLabel(point);
       const harness = document.createElement("small");
-      harness.textContent = `${point.harness} ${point.version} · ${point.reasoning}`;
+      harness.textContent = `${point.harness} ${point.version}`;
       const values = document.createElement("span");
       values.textContent = `${score(point.score)}  /  ${formatX(point.xValue)}`;
       button.append(name, harness, values);

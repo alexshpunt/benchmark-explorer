@@ -662,7 +662,7 @@ export function createDetails(state, {
     openGroupDetails({
       kind: "model route",
       card: `model:${route}`,
-      title: `Model route: ${model} · ${provider} · ${reasoning}`,
+      title: `Model route: ${modelRouteLabel(rows[0])}`,
       identity: `Provider ${provider} · reasoning ${reasoning}`,
       note: "Every accepted configuration recorded for this model route under the current filters. The model score is the median of latest model-harness combination scores, with one vote per harness.",
       summary: [
@@ -1006,7 +1006,7 @@ export function createDetails(state, {
         [
           "Scope",
           scopedRow
-            ? `${canonicalModelFamily(scopedRow.modelFamily)} · ${scopedRow.harnessFamily} ${compactVersion(scopedRow.harnessVersion)}`
+            ? configurationLabel(scopedRow)
             : "all visible configurations",
         ],
       ]),

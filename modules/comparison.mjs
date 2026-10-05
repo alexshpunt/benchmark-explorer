@@ -1,4 +1,4 @@
-import { aggregateGroupScore, aggregateToolUsage, taskFamily } from "../core.mjs";
+import { aggregateGroupScore, aggregateToolUsage, modelRouteLabelFromIdentity, taskFamily } from "../core.mjs";
 
 /** Compact version marker, e.g. "codex-cli 0.153.4" becomes "0.153.4". */
 export function compactVersion(version) {
@@ -60,7 +60,7 @@ export function createComparison(state, {
       const button = document.createElement("button");
       button.type = "button";
       button.className = "selection-label";
-      button.title = `Open ${cell.model} · ${cell.label}`;
+      button.title = `Open ${modelRouteLabelFromIdentity(cell.model)} · ${cell.label}`;
       const harness = document.createElement("span");
       harness.className = "selection-harness";
       harness.textContent = cell.baseline
@@ -69,7 +69,7 @@ export function createComparison(state, {
       if (cell.baseline) button.title += " · comparison details include measured routes only; the summary score also uses baseline for missing routes";
       const model = document.createElement("span");
       model.className = "selection-model";
-      model.textContent = cell.model;
+      model.textContent = modelRouteLabelFromIdentity(cell.model);
       button.append(harness, model);
       if (cell.runId) {
         const source = document.createElement("span");
@@ -160,7 +160,7 @@ export function createComparison(state, {
           bar.style.setProperty("--bar-color", COLORS[index]);
           const value = document.createElement("span");
           value.textContent = `${entry.score.toFixed(1)} · ${entry.finalExactRate.toFixed(0)}%`;
-          bar.title = `${row.family}\n${cell.model} · ${cell.label}\nFamily score ${entry.score.toFixed(1)} · final exact ${entry.finalExactRate.toFixed(1)}%\n${entry.taskCount} tasks\nSelect for the tasks in this family`;
+          bar.title = `${row.family}\n${modelRouteLabelFromIdentity(cell.model)} · ${cell.label}\nFamily score ${entry.score.toFixed(1)} · final exact ${entry.finalExactRate.toFixed(1)}%\n${entry.taskCount} tasks\nSelect for the tasks in this family`;
           bar.addEventListener("click", () => openTaskFamilyDetails(row.family, rowsForCell(cell)));
           // Only the score row has a "better" end, so only it gets a judgement mark.
           if (entry.score === extremes.best) bar.append(extremeMark("best"));

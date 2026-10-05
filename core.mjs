@@ -221,9 +221,11 @@ export function modelIdentity(row) {
   return `${canonicalModelFamily(row.modelFamily)}\t${modelReasoning(row)}`;
 }
 
-/** Human label for a rated model variant. */
-export function modelLabel(row) {
-  return `${canonicalModelFamily(row.modelFamily)} · ${modelReasoning(row)}`;
+/** Format model names; include the provider for exact routes, omit it for ratings. */
+export function modelLabel(row, { includeProvider = false } = {}) {
+  const model = canonicalModelFamily(row.modelFamily ?? row.modelId ?? "Model");
+  const prefix = includeProvider ? `${row.provider ?? "unknown"} / ` : "";
+  return `${prefix}${model} · ${modelReasoning(row)}`;
 }
 
 /** Exact comparison route: model family, provider, and recorded reasoning mode. */
@@ -233,7 +235,13 @@ export function modelRouteIdentity(row) {
 
 /** Model route label shown in the matrix and drill-downs. */
 export function modelRouteLabel(row) {
-  return `${canonicalModelFamily(row.modelFamily)} · ${row.provider ?? "unknown"} · ${modelReasoning(row)}`;
+  return modelLabel(row, { includeProvider: true });
+}
+
+/** Format a serialized exact route, or keep a collapsed family-only group label. */
+export function modelRouteLabelFromIdentity(identity) {
+  const [modelFamily, provider, thinking] = identity.split("\t");
+  return provider ? modelRouteLabel({ modelFamily, provider, thinking }) : modelFamily;
 }
 
 /** Position a floating filter menu inside the viewport next to its trigger. */

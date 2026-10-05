@@ -512,7 +512,7 @@ function renderRecentRuns() {
     const label = document.createElement("span");
     const name = document.createElement("strong");
     name.textContent = profile
-      ? `${profile.modelFamily ?? profile.modelId ?? "Model"} · ${profile.harnessFamily ?? profile.harnessId ?? "Harness"}`
+      ? `${modelRouteLabel(profile)} · ${profile.harnessFamily ?? profile.harnessId ?? "Harness"}`
       : run.runId;
     const id = document.createElement("small");
     id.textContent = run.runId;
@@ -546,7 +546,7 @@ function renderAllAdditions() {
     { id: "score", name: "Score", sort: false,
       cell: (row) => row.score == null ? "—" : Number((row.score * 100).toFixed(1)) },
     { id: "model", name: "Provider / model", sort: false,
-      cell: (row) => `${row.profile?.provider ?? "unknown"} / ${row.profile?.modelFamily ?? row.profile?.modelId ?? "Model"} · ${modelReasoning(row.profile ?? {})}` },
+      cell: (row) => modelRouteLabel(row.profile ?? {}) },
     { id: "agent", name: "Agent / harness", sort: false,
       cell: (row) => `${row.profile?.agentFamily ?? "Agent"} / ${row.profile?.harnessFamily ?? row.profile?.harnessId ?? "Harness"}` },
     { id: "run", name: "Run", sort: false, cell: (row) => row.runId },

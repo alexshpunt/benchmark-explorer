@@ -1,5 +1,5 @@
 import {
-  canonicalModelFamily, modelRouteIdentity,
+  canonicalModelFamily, modelRouteIdentity, modelRouteLabel,
   moveColumn, normalizeColumnLayout,
 } from "../core.mjs";
 import { Grid, h } from "../vendor/gridjs-6.2.0.mjs";
@@ -132,7 +132,7 @@ export function createLeaderboard(state, {
       id: "model",
       name: "Provider / model route / reasoning",
       tooltip: "Provider, model family and reasoning level. Select the route to inspect its sources.",
-      cell: (row) => `${row.provider ?? "unknown"} / ${canonicalModelFamily(row.modelFamily)} / ${row.thinking ?? "—"}`,
+      cell: (row) => modelRouteLabel(row),
       open: (row) => openModelDetails(modelRouteIdentity(row)),
       detail: {
         lines: [

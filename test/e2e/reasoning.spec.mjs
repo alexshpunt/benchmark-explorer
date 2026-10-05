@@ -47,18 +47,18 @@ test("all rankings and matrix match exact reasoning with collapsed groups and re
   expect(await matrixRating(page, "h")).toContain("80.0");
   expect(await matrixRating(page, "h")).toContain("2/2 routes");
   await expect(page.locator(".matrix-model-toggle")).toHaveAttribute("aria-expanded", "false");
-  await expect(routeRow(page, "m · p · low")).toHaveCount(0);
+  await expect(routeRow(page, "p / m · low")).toHaveCount(0);
   await page.locator(".matrix-model-toggle").click();
-  await expect(routeRow(page, "m · p · low")).toHaveCount(1);
-  await expect(routeRow(page, "m · p · high")).toHaveCount(1);
-  await expect(routeRow(page, "m · p · xhigh")).toHaveCount(0);
-  await expect(routeRow(page, "m · p · low")).toContainText("70.0");
-  await expect(routeRow(page, "m · p · high")).toContainText("90.0");
+  await expect(routeRow(page, "p / m · low")).toHaveCount(1);
+  await expect(routeRow(page, "p / m · high")).toHaveCount(1);
+  await expect(routeRow(page, "p / m · xhigh")).toHaveCount(0);
+  await expect(routeRow(page, "p / m · low")).toContainText("70.0");
+  await expect(routeRow(page, "p / m · high")).toContainText("90.0");
   await page.locator("#matrix-baseline-only").uncheck();
-  await expect(routeRow(page, "m · p · xhigh")).toHaveCount(1);
+  await expect(routeRow(page, "p / m · xhigh")).toHaveCount(1);
   expect(await matrixRating(page, "h")).toContain("80.0");
   await page.reload();
-  await expect(routeRow(page, "m · p · xhigh")).toHaveCount(1);
+  await expect(routeRow(page, "p / m · xhigh")).toHaveCount(1);
   await page.locator("#matrix-view").scrollIntoViewIfNeeded();
   await page.screenshot({ path: testInfo.outputPath("reasoning-matrix.png") });
   expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
@@ -67,7 +67,7 @@ test("all rankings and matrix match exact reasoning with collapsed groups and re
 
 test("reasoning filter leaves a direct row and fixed harness rating; evidence URLs restore the same mode", async ({ page }) => {
   await page.goto("/?reasoning=low");
-  await expect(routeRow(page, "m · p · low")).toHaveCount(1);
+  await expect(routeRow(page, "p / m · low")).toHaveCount(1);
   await expect(page.locator(".matrix-model-toggle")).toHaveCount(0);
   await expect(page.locator('.matrix-table thead .matrix-expand-toggle[data-harness="baseline-agent"]')).toHaveCount(0);
   await expect(page.locator('.matrix-table thead .matrix-expanded-head')).toHaveCount(0);
@@ -75,12 +75,12 @@ test("reasoning filter leaves a direct row and fixed harness rating; evidence UR
   await expect(grid(page, "models").locator("tbody tr")).toHaveCount(1);
   await expect(rankedRow(page, "models", "m · low")).toContainText("55");
   expect(await matrixRating(page, "h")).toContain("80.0");
-  await routeRow(page, "m · p · low").locator("th .matrix-header").click();
+  await routeRow(page, "p / m · low").locator("th .matrix-header").click();
   await expect(page.locator("#cell-details[open]")).toBeVisible();
-  await expect(page.locator("#cell-details-title")).toContainText("m · p · low");
+  await expect(page.locator("#cell-details-title")).toContainText("p / m · low");
   await expect(page.locator("#cell-details")).not.toContainText("high-new");
   await page.reload();
-  await expect(page.locator("#cell-details-title")).toContainText("m · p · low");
+  await expect(page.locator("#cell-details-title")).toContainText("p / m · low");
   await page.mouse.click(2, 2);
   await expect(page.locator("#cell-details")).not.toBeVisible();
   await page.locator('[data-summary-tab="combinations"]').click();
@@ -97,8 +97,8 @@ test("filtering from variant evidence keeps reasoning and comparison selections 
   await page.getByRole("button", { name: "Filter table to this model and harness", exact: true }).click();
   await expect(grid(page, "combinations").locator("tbody tr")).toHaveCount(1);
   await expect(page.locator("#active-filters")).toContainText("low");
-  await expect(routeRow(page, "m · p · high")).toHaveCount(0);
-  await routeRow(page, "m · p · low").locator(".matrix-cell").click();
+  await expect(routeRow(page, "p / m · high")).toHaveCount(0);
+  await routeRow(page, "p / m · low").locator(".matrix-cell").click();
   await expect(page.locator(".matrix-table td.selected")).toHaveCount(1);
   await page.reload();
   await expect(page.locator(".matrix-table td.selected")).toHaveCount(1);
