@@ -46,54 +46,79 @@ function svgNode(tag, attributes, text) {
   return node;
 }
 
-/** Render compact, keyboard-accessible evidence charts with a run list for overlapping points. */
+/** Render one shared date axis with colored series, a legend, and accessible run lists. */
 export function renderConfigurationHistory(rows, snapshot, openRun, options) {
   const host = document.createElement("div");
   host.className = "configuration-history";
-  for (const group of configurationHistory(rows, snapshot, options)) {
-    const figure = document.createElement("figure");
-    figure.className = "run-history";
-    const caption = document.createElement("figcaption");
-    caption.textContent = `${modelRouteLabel(group.row)} · ${group.row.harnessFamily}`;
-    figure.append(caption);
-    if (group.points.length) {
-      const svg = svgNode("svg", { viewBox: "0 0 600 180", role: "group", "aria-label": `Published score history: ${caption.textContent}` });
-      const first = group.points[0].time;
-      const last = group.points.at(-1).time;
-      const x = time => first === last ? 316 : 42 + (time - first) / (last - first) * 548;
-      const y = score => 142 - score / 100 * 120;
-      for (const score of [0, 50, 100]) {
-        svg.append(svgNode("line", { x1: 42, x2: 590, y1: y(score), y2: y(score), class: "history-grid" }),
-          svgNode("text", { x: 33, y: y(score) + 4, "text-anchor": "end" }, score));
-      }
-      svg.append(svgNode("text", { x: 42, y: 12 }, "Score"),
-        svgNode("text", { x: first === last ? 316 : 42, y: 166, "text-anchor": first === last ? "middle" : "start" }, dateFormat.format(first)));
-      if (last !== first) svg.append(svgNode("text", { x: 590, y: 166, "text-anchor": "end" }, dateFormat.format(last)));
-      svg.append(svgNode("polyline", { points: group.points.map(p => `${x(p.time)},${y(p.score)}`).join(" "), class: "history-line" }));
+  const groups = configurationHistory(rows, snapshot, options);
+  if (!groups.length) return host;
+  const figure = document.createElement("figure");
+  figure.className = "run-history";
+  const caption = document.createElement("figcaption");
+  caption.textContent = "Published score history";
+  figure.append(caption);
+  const points = groups.flatMap(group => group.points);
+  let svg;
+  let x;
+  const y = score => 142 - score / 100 * 120;
+  if (points.length) {
+    svg = svgNode("svg", { viewBox: "0 0 600 180", role: "group", "aria-label": "Published score history" });
+    const first = Math.min(...points.map(point => point.time));
+    const last = Math.max(...points.map(point => point.time));
+    x = time => first === last ? 316 : 42 + (time - first) / (last - first) * 548;
+    for (const score of [0, 50, 100]) {
+      svg.append(svgNode("line", { x1: 42, x2: 590, y1: y(score), y2: y(score), class: "history-grid" }),
+        svgNode("text", { x: 33, y: y(score) + 4, "text-anchor": "end" }, score));
+    }
+    svg.append(svgNode("text", { x: 42, y: 12 }, "Score"),
+      svgNode("text", { x: first === last ? 316 : 42, y: 166, "text-anchor": first === last ? "middle" : "start" }, dateFormat.format(first)));
+    if (last !== first) svg.append(svgNode("text", { x: 590, y: 166, "text-anchor": "end" }, dateFormat.format(last)));
+    figure.append(svg);
+  }
+  const legend = document.createElement("div");
+  legend.className = "history-legend";
+  legend.setAttribute("aria-label", "History series; select a series to inspect its runs");
+  figure.append(legend);
+  const note = document.createElement("p");
+  note.textContent = points.length
+    ? `Publication date (UTC) · ${points.length} full ${points.length === 1 ? "result" : "results"} · select a point or a series below.`
+    : "No dated full results to plot.";
+  const undated = groups.reduce((total, group) => total + group.undated, 0);
+  if (undated) note.textContent += ` ${undated} full ${undated === 1 ? "result has" : "results have"} no publication date.`;
+  figure.append(note);
+  const dates = datesFor(snapshot);
+  groups.forEach((group, index) => {
+    const baseLabel = row => `${modelRouteLabel(row)} · ${row.harnessFamily}`;
+    const peers = groups.filter(peer => baseLabel(peer.row) === baseLabel(group.row));
+    const differences = [["agentFamily", "agent"], ["benchmarkId", "benchmark"], ["benchmarkVersion", "benchmark version"],
+      ["contract", "contract"], ["transport", "transport"], ["harnessKind", "harness kind"]]
+      .filter(([field]) => peers.some(peer => peer.row[field] !== group.row[field]))
+      .map(([field, name]) => `${name} ${group.row[field] ?? "unspecified"}`);
+    const label = [baseLabel(group.row), ...differences].join(" · ");
+    const color = index < 4 ? `var(--series-${index + 1})` : `oklch(65% 0.15 ${(index * 137.508) % 360})`;
+    if (svg && group.points.length) {
+      const series = svgNode("g", { class: "history-series", "data-series-label": label, role: "group", "aria-label": label });
+      series.style.setProperty("--history-color", color);
+      series.append(svgNode("polyline", { points: group.points.map(p => `${x(p.time)},${y(p.score)}`).join(" "), class: "history-line" }));
       for (const point of group.points) {
-        const label = `${point.row.runId}: ${point.score.toFixed(1)}, published ${dateFormat.format(point.time)}, ${point.row.harnessFamily} ${point.row.harnessVersion ?? "unspecified"}`;
+        const description = `${point.row.runId}: ${point.score.toFixed(1)}, published ${dateFormat.format(point.time)}, ${label} ${point.row.harnessVersion ?? "unspecified"}`;
         const circle = svgNode("circle", { cx: x(point.time), cy: y(point.score), r: 5, tabindex: 0, role: "button",
-          "aria-label": label, "data-run-id": point.row.runId, class: "run-history-point" });
-        circle.append(svgNode("title", {}, label));
+          "aria-label": description, "data-run-id": point.row.runId, class: "run-history-point" });
+        circle.append(svgNode("title", {}, description));
         circle.addEventListener("click", () => openRun(point.row.runId));
         circle.addEventListener("keydown", event => {
           if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openRun(point.row.runId); }
         });
-        svg.append(circle);
+        series.append(circle);
       }
-      figure.append(svg);
+      svg.append(series);
     }
-    const note = document.createElement("p");
-    note.textContent = group.points.length
-      ? `Publication date (UTC) · ${group.points.length} full results · select a point or a run below.`
-      : "No dated full results to plot.";
-    if (group.undated) note.textContent += ` ${group.undated} full ${group.undated === 1 ? "result has" : "results have"} no publication date.`;
-    figure.append(note);
     const disclosure = document.createElement("details");
+    disclosure.className = "history-runs";
+    disclosure.dataset.seriesLabel = label;
     const summary = document.createElement("summary");
-    summary.textContent = `Run history (${group.rows.length})`;
+    summary.textContent = `${label} · Run history (${group.rows.length})`;
     const list = document.createElement("ul");
-    const dates = datesFor(snapshot);
     const order = row => { const time = timestamp(dates.get(row.runId)); return Number.isFinite(time) ? time : Infinity; };
     const sorted = group.rows.toSorted((a, b) => order(a) - order(b) || a.runId.localeCompare(b.runId));
     for (const row of sorted) {
@@ -109,7 +134,22 @@ export function renderConfigurationHistory(rows, snapshot, openRun, options) {
     }
     disclosure.append(summary, list);
     figure.append(disclosure);
-    host.append(figure);
-  }
+    const entry = document.createElement("button");
+    entry.type = "button";
+    entry.className = "details-link";
+    entry.title = `Show run history for ${label}`;
+    entry.style.setProperty("--history-color", color);
+    const swatch = document.createElement("span");
+    swatch.className = "history-swatch";
+    swatch.setAttribute("aria-hidden", "true");
+    entry.append(swatch, label);
+    entry.addEventListener("click", () => {
+      disclosure.open = true;
+      summary.focus();
+      disclosure.scrollIntoView({ block: "nearest" });
+    });
+    legend.append(entry);
+  });
+  host.append(figure);
   return host;
 }
