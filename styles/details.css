@@ -251,3 +251,27 @@
 .additions-grid { height: calc(100% - 76px); overflow: auto; }
 .additions-grid .results-table { height: 100%; }
 .additions-grid .gridjs-wrapper { max-height: none; }
+
+.configuration-history { margin-top: 16px; }
+.run-history { margin: 0 0 16px; padding-top: 10px; border-top: 1px solid var(--border); }
+.run-history figcaption { font-size: var(--text-small); font-weight: 600; overflow-wrap: anywhere; }
+.run-history svg { display: block; width: 100%; max-width: 640px; margin: 8px 0; }
+.run-history svg text { fill: var(--muted); font-family: var(--sans); font-size: 13px; }
+.history-grid { stroke: var(--border); }
+.history-line { fill: none; stroke: var(--blue); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.run-history-point { fill: var(--surface); stroke: var(--blue); stroke-width: 2; cursor: pointer; vector-effect: non-scaling-stroke; }
+.run-history-point:hover, .run-history-point:focus-visible { fill: var(--blue); stroke: var(--text); outline: none; }
+.run-history summary { width: fit-content; color: var(--blue); cursor: pointer; font-size: var(--text-small); }
+.run-history ul { margin: 8px 0; padding-left: 20px; max-height: 220px; overflow: auto; }
+.run-history li { margin-bottom: 8px; font-size: var(--text-small); overflow-wrap: anywhere; }
+@media (max-width: 600px) {
+  .configuration-history { min-width: 0; }
+  .configuration-history svg text { font-size: 20px; }
+  .configuration-list > .details-table { table-layout: fixed; font-size: var(--text-small); }
+  .configuration-list > .details-table th, .configuration-list > .details-table td { padding: 6px 4px; }
+  .configuration-list > .details-table th:first-child { width: 36%; overflow-wrap: anywhere; }
+  .configuration-list > .details-table th:nth-child(2) { width: 30%; }
+  .configuration-list > .details-table td:nth-child(2), .configuration-list > .details-table th:nth-child(2) { white-space: normal; }
+  .configuration-list > .details-table th:nth-child(3) { width: 20%; }
+  .configuration-list > .details-table th:nth-child(4) { width: 14%; }
+}

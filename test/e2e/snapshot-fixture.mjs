@@ -2,8 +2,8 @@ import { createHash } from "node:crypto";
 import { gzipSync } from "node:zlib";
 import { aggregateRunConfigurations, markFullBenchmarkRows } from "../../core.mjs";
 
-/** Build a checked browser snapshot from run/harness/version/reasoning/pass-count/task-count/model tuples. */
-export function snapshotFixture(cases) {
+/** Build a checked browser snapshot from run tuples; configure can change evidence before hashing. */
+export function snapshotFixture(cases, configure = () => {}) {
   const revision = "a".repeat(40);
   const taskIds = Array.from({ length: 10 }, (_, index) => `edit/task-${index}`);
   const index = { schemaVersion: 1, runs: cases.map(([runId, _harness, _version, _thinking, _passes, taskLimit = 10]) => ({ runId, counts: { trials: taskLimit, rounds: taskLimit, toolCalls: 0 },
@@ -24,8 +24,10 @@ export function snapshotFixture(cases) {
   const runRows = { all: rows };
   views.fullRunKeys = markFullBenchmarkRows(runRows, views);
   const acceptedRuns = rows.map((row) => ({ runId: row.runId, acceptedAt: "2026-09-30T00:00:00Z", score: row.score }));
-  const bytes = gzipSync(JSON.stringify({ schemaVersion: 1, revision, index, views, runRows, acceptedRuns,
-    recentRuns: acceptedRuns.slice(0, 8), profiles, trials, rounds, toolCounts: [] }));
+  const snapshot = { schemaVersion: 1, revision, index, views, runRows, acceptedRuns,
+    recentRuns: acceptedRuns.slice(0, 8), profiles, trials, rounds, toolCounts: [] };
+  configure(snapshot);
+  const bytes = gzipSync(JSON.stringify(snapshot));
   const sha256 = createHash("sha256").update(bytes).digest("hex");
   const manifest = { schemaVersion: 1, revision, file: `snapshots/snapshot.${sha256}.json.gz`, sha256, trials: trials.length };
   return { bytes, manifest };

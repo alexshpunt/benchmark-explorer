@@ -4,6 +4,7 @@ import {
   modelRouteIdentity, modelRouteLabel, modelReasoning, precomputedFamilyScore, taskFamily, toolTrialCounts,
 } from "../core.mjs";
 import { compactVersion } from "./comparison.mjs";
+import { publicationDateText, renderConfigurationHistory } from "./run-history.mjs";
 
 /** Create the shared cards and detail-dialog helpers. */
 export function createDetails(state, {
@@ -266,8 +267,9 @@ export function createDetails(state, {
   }
 
   /** Score spread and the configurations behind a model, harness or cell. */
-  function configurationListSection(rows, title) {
+  function configurationListSection(rows, title, historyOptions) {
     const section = detailsSection(`${title} (${rows.length})`);
+    section.classList.add("configuration-list");
     const summary = describeDistribution(rows.filter((row) => row.fullBenchmark)
       .map((row) => row.score * 100));
     if (summary) {
@@ -277,13 +279,14 @@ export function createDetails(state, {
     }
     section.append(
       detailTable(
-        ["Configuration", "Score", "Trials"],
+        ["Configuration", "Published (UTC)", "Score", "Trials"],
         rows
           .toSorted((left, right) => Number(right.fullBenchmark) - Number(left.fullBenchmark) ||
             (right.fullBenchmark ? right.score - left.score : right.taskCount - left.taskCount))
           .map((row) => ({
             cells: [
               configurationLabel(row),
+              publicationDateText(row.runIds ?? [row.runId], state.snapshot),
               row.fullBenchmark ? (row.score * 100).toFixed(3) : "— (partial)",
               row.observations.toLocaleString(),
             ],
@@ -291,6 +294,7 @@ export function createDetails(state, {
           })),
       ),
     );
+    section.append(renderConfigurationHistory(rows, state.snapshot, openRunDetails, historyOptions));
     return section;
   }
 
@@ -560,9 +564,8 @@ export function createDetails(state, {
           return section;
         })(),
       );
-    } else {
-      sections.push(configurationListSection(rows, "Configurations in this selection"));
     }
+    sections.push(configurationListSection(rows, "Configurations in this selection"));
     sections.push(taskOutcomeSection(rows), provenanceSection(rows));
     sections.push(
       actionsSection([
@@ -603,7 +606,7 @@ export function createDetails(state, {
     loadingText.textContent = "Loading this run’s verified rounds and tool calls…";
     loading.append(loadingText);
     openDetailsDialog(`Run: ${runId}`, subtitle, [
-      configurationListSection(rows, "Configurations in this run"),
+      configurationListSection(rows, "Configurations in this run", { runId }),
       taskOutcomeSection(rows),
       loading,
       provenanceSection(rows),
@@ -634,7 +637,7 @@ export function createDetails(state, {
         ]),
       );
       openDetailsDialog(`Run: ${runId}`, subtitle, [
-        configurationListSection(rows, "Configurations in this run"),
+        configurationListSection(rows, "Configurations in this run", { runId }),
         taskOutcomeSection(rows),
         evidenceSection,
         provenanceSection(rows),
@@ -646,7 +649,7 @@ export function createDetails(state, {
       message.textContent = "The run’s detailed files could not be verified. Try again later.";
       failure.append(message);
       openDetailsDialog(`Run: ${runId}`, subtitle, [
-        configurationListSection(rows, "Configurations in this run"),
+        configurationListSection(rows, "Configurations in this run", { runId }),
         taskOutcomeSection(rows),
         failure,
         provenanceSection(rows),
