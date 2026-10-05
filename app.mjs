@@ -546,7 +546,7 @@ function renderAllAdditions() {
     { id: "score", name: "Score", sort: false,
       cell: (row) => row.score == null ? "—" : Number((row.score * 100).toFixed(1)) },
     { id: "model", name: "Provider / model", sort: false,
-      cell: (row) => `${row.profile?.provider ?? "unknown"} / ${row.profile?.modelFamily ?? row.profile?.modelId ?? "Model"}` },
+      cell: (row) => `${row.profile?.provider ?? "unknown"} / ${row.profile?.modelFamily ?? row.profile?.modelId ?? "Model"} · ${modelReasoning(row.profile ?? {})}` },
     { id: "agent", name: "Agent / harness", sort: false,
       cell: (row) => `${row.profile?.agentFamily ?? "Agent"} / ${row.profile?.harnessFamily ?? row.profile?.harnessId ?? "Harness"}` },
     { id: "run", name: "Run", sort: false, cell: (row) => row.runId },

@@ -6,7 +6,7 @@ import { aggregateRunConfigurations, markFullBenchmarkRows } from "../../core.mj
 export function snapshotFixture(cases) {
   const revision = "a".repeat(40);
   const taskIds = Array.from({ length: 10 }, (_, index) => `edit/task-${index}`);
-  const index = { schemaVersion: 1, runs: cases.map(([runId]) => ({ runId,
+  const index = { schemaVersion: 1, runs: cases.map(([runId, _harness, _version, _thinking, _passes, taskLimit = 10]) => ({ runId, counts: { trials: taskLimit, rounds: taskLimit, toolCalls: 0 },
     definitions: { taskSet: { taskIds } }, benchmark: { id: "explicit-edit", version: "1" } })) };
   const profiles = cases.map(([runId, harnessFamily, harnessVersion, thinking, _passes, _tasks, modelFamily = "m"]) => ({
     runId, profileId: "profile", configurationHash: runId, modelFamily, provider: "p", thinking,
