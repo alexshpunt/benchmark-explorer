@@ -1,34 +1,43 @@
 # Benchmark Explorer
 
-Private source for the public [Benchmark Explorer](https://huggingface.co/spaces/alexshpunt/benchmark-explorer) Space.
+[Open Benchmark Explorer](https://huggingface.co/spaces/alexshpunt/benchmark-explorer) to compare models and agent harnesses on precise text-editing tasks from the [Explicit Edit Benchmark](https://github.com/alexshpunt/explicit-edit-benchmark).
 
-The Space reads accepted, generated views from the public [Explicit Edit Benchmark dataset](https://huggingface.co/datasets/alexshpunt/explicit-edit-benchmark). Never commit credentials or private benchmark payloads here.
+The Explorer presents accepted results from the public [benchmark Dataset](https://huggingface.co/datasets/alexshpunt/explicit-edit-benchmark). Browse model and harness rankings, compare score, cost and token use, filter the matrix, or open a run to inspect its published evidence. Partial runs remain available in the run details but do not contribute to the complete-run summaries. See [the scoring contract](docs/scoring.md) for the definitions and aggregation rules.
 
-Run `npm run build:snapshot` before serving locally. The build resolves the current Dataset commit, downloads its single UI-ready `data/explorer-summary.json.gz`, checks the published SHA-256 digest, and writes a content-addressed file under `dist/snapshots/` plus `dist/snapshot-manifest.json`. Serve the app files together with those generated files at the web root. The deploy workflow builds and publishes them with the Space.
+## Data and updates
 
-Run `npm run preview` to serve the app at `http://127.0.0.1:8768/`. The preview server requests its own root page every minute and logs the response.
+Each deployment uses a snapshot pinned to a Dataset revision. The build downloads the published Explorer summary, verifies its SHA-256 digest and creates a content-addressed snapshot. The browser uses that snapshot for ordinary navigation. When you open a run, it fetches only that run's evidence from the same Dataset revision and verifies the published checksums.
 
-Run `npm ci`, `npx playwright install chromium`, and `npm run test:e2e` for repeatable browser checks. The tests serve the real Explorer against a small checksum-verified snapshot fixture, covering separate reasoning scores, exact baseline matching, per-mode versions, repeats, filters, groups, evidence URLs, and cross-view agreement on desktop dark and mobile light. Browser artifacts go under `.tmp/e2e-results/`. The deployment workflow runs these checks before publishing.
+The deployment workflow checks for Dataset updates and publishes the application and snapshot to the Hugging Face Space. Accepted data and exclusions are maintained in the Dataset, not edited by the Explorer.
 
-The Explorer is a public leaderboard for comparing how models and harnesses behave on precise text-editing tasks. Its header shows the number of published runs and the latest additions in the pinned Dataset index. The header shows five to eight additions, fitting the desktop intro height; stacked layouts show five. Each addition shows its acceptance commit date and the median score of full-benchmark configurations (or a dash if none are full), and opens that run's evidence inside the Explorer. View all opens the complete acceptance history in fixed newest-first order. The same Date added field is available as an optional leaderboard column; aggregated configurations use their newest included run. The build reads commit history at the pinned Dataset revision; the browser never fetches it.
+## Run locally
 
-All derived ratings use `modules/scoring.mjs`; [docs/scoring.md](docs/scoring.md) states the exact contract. Model + harness shows the median full-run score after selecting the latest complete version separately per model-provider-reasoning route. A rated model is model family × reasoning; providers merge only within that variant, after route-level version selection. Missing reasoning is explicitly unspecified, not off. Model score is the median of its harness-combination scores, with one vote per harness. Harness score uses the same baseline-agent adjustment as the matrix, on a fixed snapshot-wide route set; active filters select visible harnesses without changing their ratings. Model and combination rankings follow active filters. Missing stays missing in evidence; only harness totals use zero delta. Published run, task, and badge scores remain labeled source evidence.
+Requirements: Node.js and npm, Python 3, and network access to the public Dataset.
 
-The header invites community participation and shows typical cost and estimated run time at concurrency 10 for one full model-provider-harness-reasoning result. `modules/community.mjs` calculates the median and P10–P90 from positive fully measured totals in the snapshot, with separate sample counts for each metric. Run time is summed task duration divided by 10, not measured elapsed wall time. It assumes all ten slots stay busy; uneven tasks, rate limits, and overhead can increase elapsed time. The time card also shows original summed duration. Contributor rankings use Dataset attribution and count full model results inside batches separately. Header links open cards for participation, methodology, cost, task time, contributor evidence, and news. Cards close with Close, Escape, or a click on the backdrop; there is no expanded guide block above the rankings. Edit the news entries in `index.html`; keep unreleased v2 and hard-subset work clearly marked as plans.
-We aim to make every visible result clickable. A number, model, harness, run, or summary should lead to its underlying detail, a useful filtered view, or its published source. Do not make something look interactive unless it goes somewhere useful.
+```sh
+npm ci
+npm run build:snapshot
+npm run preview
+```
 
-The Pareto chart plots full model-route × harness × reasoning combinations with a fully measured value on the selected horizontal axis: price or total tokens. Prices are never estimated. Each square uses the latest full harness version; distinct runs contribute median score and axis value. A score whisker appears only when repeated runs disagree. A dashed line links measured reasoning levels of the same model route and harness version; the solid line joins non-dominated combinations. Click a square or frontier entry to compare up to four. When squares overlap, the nearby list lets you pick each one. The matrix below also shows results missing a measured price or token count.
+Open http://127.0.0.1:8768/. The preview server logs a periodic request to its root page. The snapshot build writes to `dist/`; serve the generated manifest and snapshots with the application files at the web root.
 
-Matrix groups only appear when they contain multiple visible members. Groups start collapsed. Singleton provider × reasoning routes and rare harness groups stay direct, and harness version expansion is offered only for multiple visible versions. Active filters and the baseline-route display mode determine visible membership; snapshot-wide rarity thresholds and harness ratings stay unchanged.
+## Checks
 
-The browser entry point is `app.mjs`. Interactive views live in `modules/`: `summary-leaderboards.mjs` calculates and renders the three summary rankings, `pareto-data.mjs` builds plotted results and `pareto.mjs` draws the chart, `matrix.mjs` renders grouped scores, `leaderboard.mjs` renders the Runs table, `comparison.mjs` renders selected-run comparisons, `details.mjs` renders cards and dialogs, and `filters.mjs` owns filter menus and table controls. Their matching styles are in `styles/`; `index.html` loads them in cascade order. The deploy workflow publishes both directories with the entry point and snapshot.
+```sh
+npm run check
+npx playwright install chromium
+npm run test:e2e
+```
 
-In the Score matrix, Across all models shows the baseline-adjusted mean for each harness across every model–provider–reasoning route with a full baseline-agent run. The displayed change is the sum of measured differences divided by the full baseline route count; missing routes have zero change. It also shows measured route coverage. Each harness, including baseline-agent, uses its latest complete version separately per route; repeats of that version are pooled into one median route score. The model summary column is gone. Other matrix metrics still show medians across measured model families.
-Baseline routes only is enabled by default. It hides routes without a full baseline-agent result before grouping provider × reasoning variants under their base model. Turn it off to see all measured routes; the shared baseline route set, scores, deltas, and coverage do not change. The display mode is saved in the URL (`matrixRoutes=all`).
+`npm run check` checks JavaScript syntax and runs the Node.js tests. The browser tests use a small checksum-verified snapshot fixture; their artifacts are written to `.tmp/e2e-results/`. The deployment workflow runs both checks before publishing.
 
-Matrix scores and other measured summaries use only complete benchmark runs. In Score, a cell without a complete run shows a dash and the most complete single run's task count against the published benchmark total (currently 226). Partial runs remain available in details and comparisons, but their scores and measurements do not enter the summaries.
-The matrix keeps harnesses with more than three full accepted model-route results as separate columns. Each model route inside a batched run counts separately; repeated configurations of the same route in that run count once. Rarer Pi extensions share an expandable pi-extensions column; other rare harnesses share Others. Counts come from the whole published Dataset, so filtering does not change group membership. DeepSeek modes have no special group.
+## Project structure
 
-The browser loads one checked snapshot for the leaderboard, matrix, filters, comparisons, and charts. Tool events are transferred as compact counters and expanded locally, so ordinary interaction does not fetch run shards. Opening a run loads only that run’s profiles, trials, rounds, and tool calls from the pinned Dataset revision, verifies every published checksum, and caches the result for the page session. Scores and exclusions still come from the accepted Dataset views; the Space does not edit accepted data.
+- `app.mjs` is the browser entry point; `core.mjs` contains shared data handling.
+- `modules/` contains interactive views and scoring logic. `modules/scoring.mjs` owns derived ratings.
+- `styles/` contains the styles loaded by `index.html`.
+- `scripts/build-snapshot.mjs` builds the revision-pinned snapshot.
+- `.github/workflows/deploy.yml` tests and deploys the Space.
 
-Harness card links may use `card=harness:FAMILY@latest`. The Explorer resolves `latest` to the highest accepted semantic version for that harness family.
+Results should lead to their details, a useful filtered view or published evidence. Keep the Explorer tied to the checked Dataset snapshot and fetch a run's files only when that run is opened.
